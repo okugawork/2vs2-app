@@ -1,0 +1,36 @@
+<!DOCTYPE html>
+<html lang="ja">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ピックル試合 - 参加者登録</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+
+<body>
+  <main class="container">
+    <header>
+      <h1>ピックル試合</h1>
+      <p>参加者を登録して、一覧を確認します。</p>
+    </header>
+
+    <section class="registration">
+      <label for="playerName">名前入力:</label>
+      <div class="input-group">
+        <input id="playerName" type="text" placeholder="例: 山田 太郎" autocomplete="off">
+        <button id="registerButton">登録</button>
+      </div>
+      <p class="hint">名前を入力して「登録」を押すと、参加者一覧に追加されます。</p>
+    </section>
+
+    <section class="participants">
+      <h2>参加者一覧</h2>
+      <ul id="participantList" class="participant-list"></ul>
+    </section>
+  </main>
+
+  <script src="script.js"></script>
+</body>
+
+</html>
