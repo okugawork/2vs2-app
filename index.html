@@ -4,7 +4,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>ピックル試合 - 参加者登録</title>
+  <title>ピックル試合 - ペア作成</title>
   <link rel="stylesheet" href="styles.css">
 </head>
 
@@ -12,21 +12,42 @@
   <main class="container">
     <header>
       <h1>ピックル試合</h1>
-      <p>参加者を登録して、一覧を確認します。</p>
+      <p>人数を選んで、ランダムな2vs2の組み合わせを作成します。</p>
     </header>
 
-    <section class="registration">
-      <label for="playerName">名前入力:</label>
+    <section class="setup">
+      <label for="participantCount">人数を選択:</label>
       <div class="input-group">
-        <input id="playerName" type="text" placeholder="例: 山田 太郎" autocomplete="off">
-        <button id="registerButton">登録</button>
+        <select id="participantCount">
+          <option value="3">3人</option>
+          <option value="4">4人</option>
+          <option value="5">5人</option>
+          <option value="6">6人</option>
+          <option value="7">7人</option>
+          <option value="8">8人</option>
+          <option value="9">9人</option>
+          <option value="10">10人</option>
+          <option value="11">11人</option>
+          <option value="12" selected>12人</option>
+          <option value="13">13人</option>
+          <option value="14">14人</option>
+          <option value="15">15人</option>
+          <option value="16">16人</option>
+          <option value="17">17人</option>
+          <option value="18">18人</option>
+          <option value="19">19人</option>
+          <option value="20">20人</option>
+        </select>
+        <button id="createMatchesButton">ペア作成</button>
       </div>
-      <p class="hint">名前を入力して「登録」を押すと、参加者一覧に追加されます。</p>
+      <p class="hint">3人以上の人数を選ぶと、2vs2の試合をランダムに作成できます。</p>
     </section>
 
-    <section class="participants">
-      <h2>参加者一覧</h2>
-      <ul id="participantList" class="participant-list"></ul>
+    <section class="results">
+      <h2>作成結果</h2>
+      <p id="resultSummary" class="result-summary empty-state">まだ作成結果はありません。人数を選んで「ペア作成」を押してください。</p>
+      <div id="matchList" class="match-list"></div>
+      <p id="remainderText" class="remainder-text"></p>
     </section>
   </main>
 

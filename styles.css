@@ -19,7 +19,7 @@ body {
 }
 
 .container {
-  width: min(720px, 100%);
+  width: min(760px, 100%);
   background: #ffffff;
   border-radius: 16px;
   box-shadow: 0 14px 40px rgba(0, 0, 0, 0.08);
@@ -36,7 +36,7 @@ header p {
   color: #555;
 }
 
-.registration {
+.setup {
   margin-top: 24px;
 }
 
@@ -47,12 +47,13 @@ header p {
   margin-top: 12px;
 }
 
-input[type="text"] {
-  flex: 1 1 240px;
+select {
+  flex: 1 1 180px;
   padding: 12px 14px;
   border: 1px solid #cecece;
   border-radius: 10px;
   font-size: 1rem;
+  background: #fff;
 }
 
 button {
@@ -70,39 +71,52 @@ button:hover {
   background: #1f75e0;
 }
 
-button:disabled {
-  background: #a3c4ff;
-  cursor: not-allowed;
-}
-
 .hint {
   margin: 8px 0 0;
   color: #666;
 }
 
-.participants {
+.results {
   margin-top: 32px;
 }
 
-.participants h2 {
+.result-summary {
   margin-bottom: 16px;
+  color: #2b4a63;
+  font-weight: 600;
 }
 
-.participant-list {
-  list-style: none;
-  padding: 0;
-  margin: 0;
+.empty-state {
+  color: #7a7a7a;
+  font-weight: 500;
+}
+
+.match-list {
   display: grid;
-  gap: 10px;
+  gap: 12px;
 }
 
-.participant-item {
-  padding: 14px 16px;
+.match-card {
+  padding: 16px;
   background: #f1f6ff;
   border: 1px solid #d7e5ff;
   border-radius: 12px;
 }
 
-.empty-state {
-  color: #7a7a7a;
+.match-title {
+  margin: 0 0 8px;
+  font-size: 1rem;
+  color: #1f4c7a;
+}
+
+.match-text {
+  margin: 0;
+  font-size: 1.1rem;
+  font-weight: 700;
+}
+
+.remainder-text {
+  margin-top: 16px;
+  color: #7a2e2e;
+  font-weight: 600;
 }
