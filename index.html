@@ -51,9 +51,21 @@
         </div>
         <button id="createMatchesButton">ペア作成</button>
         <button id="resetButton" class="secondary-button" type="button">リセット</button>
+        <div class="mid-controls">
+          <div class="field-group inline-group">
+            <label for="addParticipantButton">参加者追加:</label>
+            <button id="addParticipantButton" type="button">参加者追加</button>
+          </div>
+          <div class="field-group inline-group">
+            <label for="removeParticipantSelect">途中退場番号:</label>
+            <select id="removeParticipantSelect"></select>
+            <button id="removeParticipantButton" type="button">途中退場</button>
+          </div>
+        </div>
       </div>
       <p class="hint">人数とコート数に合わせて、2vs2の試合をランダムに作成できます。</p>
       <p id="modeHint" class="hint">初回のペア作成前に人数とコート数を変更できます。変更する場合は「リセット」を押してください。</p>
+      <p id="pendingNotice" class="pending-notice"></p>
     </section>
 
     <section class="results">

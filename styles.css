@@ -48,6 +48,26 @@ header p {
   align-items: end;
 }
 
+.mid-controls {
+  display: none;
+  /* 初期は非表示。ロック時に表示 */
+  gap: 12px;
+  align-items: end;
+}
+
+.mid-controls .inline-group {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+/* 追加・退場の保留メッセージ */
+.pending-notice {
+  margin-top: 8px;
+  color: #1f7a3a;
+  font-weight: 600;
+}
+
 .field-group {
   display: flex;
   flex-direction: column;
@@ -180,4 +200,12 @@ button:disabled {
 
 .rest-table th {
   background: #ffe8e0;
+}
+
+/* 途中退場（廃番）をグレーアウト表示 */
+.rest-table td.retired,
+.rest-table td.retired+td {
+  color: #8b8b8b;
+  background: #fafafa;
+  opacity: 0.7;
 }
