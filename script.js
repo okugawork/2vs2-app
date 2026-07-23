@@ -10,6 +10,19 @@ const addParticipantButton = document.getElementById("addParticipantButton"); //
 const removeParticipantSelect = document.getElementById("removeParticipantSelect"); // 途中退場番号セレクト
 const removeParticipantButton = document.getElementById("removeParticipantButton"); // 途中退場ボタン
 const pendingNotice = document.getElementById("pendingNotice"); // 追加/退場の保留メッセージ
+const confirmModal = document.getElementById("confirmModal");
+const confirmCreateButton = document.getElementById("confirmCreateButton");
+const cancelCreateButton = document.getElementById("cancelCreateButton");
+const tabMatch = document.getElementById("tabMatch");
+const tabHistory = document.getElementById("tabHistory");
+const tabStats = document.getElementById("tabStats");
+const screenMatch = document.getElementById("screen-match");
+const screenHistory = document.getElementById("screen-history");
+const screenStats = document.getElementById("screen-stats");
+const summaryParticipants = document.getElementById("summaryParticipants");
+const summaryCourts = document.getElementById("summaryCourts");
+const summaryRestCount = document.getElementById("summaryRestCount");
+const summaryNextMatch = document.getElementById("summaryNextMatch");
 
 // === ゲーム状態管理用変数 ===
 let restCounts = []; // 各プレイヤーの休憩回数を記録する配列（インデックス = プレイヤー番号）
@@ -295,6 +308,11 @@ function renderMatches(courtCount) {
   matchListElement.innerHTML = "";
   modeHint.textContent = "人数とコート数を変更するには「リセット」を押してください。";
 
+  if (summaryParticipants) summaryParticipants.textContent = `${totalCount}人`;
+  if (summaryCourts) summaryCourts.textContent = `${safeCourtCount}コート`;
+  if (summaryRestCount) summaryRestCount.textContent = restNumbers.length > 0 ? `${restNumbers.length}` : "0";
+  if (summaryNextMatch) summaryNextMatch.textContent = `${matches.length}試合`;
+
   if (safeCourtCount > Math.floor(totalCount / 4)) {
     const warning = document.createElement("p"); // 警告メッセージ要素を作成
     warning.className = "warning-text";
@@ -327,8 +345,7 @@ function renderMatches(courtCount) {
   }
 }
 
-// ペア作成ボタンが押されたときの処理です。
-createMatchesButton.addEventListener("click", () => {
+function handleCreateMatches() {
   const courtCount = Math.max(1, Number(courtCountInput.value) || 1);
 
   // 初回は participantCountSelect の値で参加者を初期化
@@ -339,7 +356,66 @@ createMatchesButton.addEventListener("click", () => {
   renderMatches(courtCount);
   isLocked = true;
   setControlsLocked(true);
+}
+
+function showCreateConfirm() {
+  if (!confirmModal) {
+    handleCreateMatches();
+    return;
+  }
+  confirmModal.classList.remove("hidden");
+}
+
+function hideCreateConfirm() {
+  if (confirmModal) {
+    confirmModal.classList.add("hidden");
+  }
+}
+
+// ペア作成ボタンが押されたときの処理です。
+createMatchesButton.addEventListener("click", () => {
+  showCreateConfirm();
 });
+
+if (confirmCreateButton) {
+  confirmCreateButton.addEventListener("click", () => {
+    hideCreateConfirm();
+    handleCreateMatches();
+  });
+}
+
+if (cancelCreateButton) {
+  cancelCreateButton.addEventListener("click", () => {
+    hideCreateConfirm();
+  });
+}
+
+function activateTab(tabButton, screen) {
+  [tabMatch, tabHistory, tabStats].forEach((tab) => {
+    tab.classList.toggle("active", tab === tabButton);
+  });
+  [screenMatch, screenHistory, screenStats].forEach((panel) => {
+    panel.classList.toggle("active", panel === screen);
+  });
+}
+
+if (tabMatch) {
+  tabMatch.addEventListener("click", () => {
+    activateTab(tabMatch, screenMatch);
+  });
+}
+
+if (tabHistory) {
+  tabHistory.addEventListener("click", () => {
+    activateTab(tabHistory, screenHistory);
+  });
+}
+
+if (tabStats) {
+  tabStats.addEventListener("click", () => {
+    activateTab(tabStats, screenStats);
+  });
+}
 
 // リセットボタンが押されたときの処理です。
 resetButton.addEventListener("click", () => {
@@ -398,3 +474,4 @@ removeParticipantButton.addEventListener("click", () => {
 // 最初に画面を初期状態にします。
 resetResults();
 setControlsLocked(false);
+if (tabMatch) activateTab(tabMatch, screenMatch);
