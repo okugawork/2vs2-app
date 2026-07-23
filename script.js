@@ -62,26 +62,26 @@ function chooseRestNumbersFromActive(restCount) {
     return [];
   }
   const selected = [];
-  const workingCounts = { ...restCounts };
+  const workingCounts = {};
+
+  // activeNumbers の値を必ず揃えておく
+  for (const number of activeNumbers) {
+    ensureRestCountExists(number);
+    workingCounts[number] = restCounts[number];
+  }
 
   for (let index = 0; index < restCount; index += 1) {
-    // 現在参加しているメンバーの最小休憩回数を求める
-    const counts = activeNumbers.map((n) => {
-      ensureRestCountExists(n);
-      return restCounts[n];
-    });
-    const minimumCount = Math.min(...counts);
-    const candidates = [];
+    const minimumCount = Math.min(...activeNumbers.map((n) => workingCounts[n]));
+    const candidates = activeNumbers.filter(
+      (number) => !selected.includes(number) && workingCounts[number] === minimumCount
+    );
 
-    for (const number of activeNumbers) {
-      if (!selected.includes(number) && workingCounts[number] === minimumCount) {
-        candidates.push(number);
-      }
-    }
+    const pickedNumber = candidates.length > 0
+      ? candidates[Math.floor(Math.random() * candidates.length)]
+      : activeNumbers.find((number) => !selected.includes(number));
 
-    const pickedNumber = candidates[Math.floor(Math.random() * candidates.length)];
     selected.push(pickedNumber);
-    workingCounts[pickedNumber] = (workingCounts[pickedNumber] || 0) + 1;
+    workingCounts[pickedNumber] += 1;
   }
 
   return selected.sort((a, b) => a - b);
@@ -204,18 +204,9 @@ function createMatches(courtCount) {
   return { matches, restNumbers };
 }
 
-// 休憩回数表だけを描画/更新する関数
-function renderRestTable() {
-  // remove existing rest table elements if present
-  const existingWrapper = document.querySelector('.rest-table-wrapper');
-  const existingRestCard = document.querySelector('.rest-card');
-  if (existingWrapper) existingWrapper.remove();
-  if (existingRestCard) existingRestCard.remove();
+function buildRestSection(restNumbers) {
+  const maxNumberToShow = Math.max(nextNumber - 1, activeNumbers.length);
 
-  const totalCount = activeNumbers.length;
-  // If there's nothing to show and no numbers ever assigned, do nothing
-  const maxNumberToShow = Math.max(nextNumber - 1, totalCount);
-  // create restCard
   const restCard = document.createElement('div');
   restCard.className = 'rest-card';
   const restTitle = document.createElement('p');
@@ -223,8 +214,7 @@ function renderRestTable() {
   restTitle.textContent = '休憩者';
   const restMembers = document.createElement('p');
   restMembers.className = 'match-text';
-  restMembers.textContent = lastRestNumbers.length > 0 ? lastRestNumbers.join(', ') : '';
-
+  restMembers.textContent = restNumbers.length > 0 ? restNumbers.join(', ') : '';
   restCard.appendChild(restTitle);
   restCard.appendChild(restMembers);
 
@@ -267,7 +257,15 @@ function renderRestTable() {
   restTableWrapper.appendChild(restTableTitle);
   restTableWrapper.appendChild(restTable);
 
-  // append to matchListElement (after any existing match cards)
+  return { restCard, restTableWrapper };
+}
+
+function renderRestTable() {
+  const existingWrapper = document.querySelector('.rest-table-wrapper');
+  const existingRestCard = document.querySelector('.rest-card');
+  if (existingWrapper) existingWrapper.remove();
+  if (existingRestCard) existingRestCard.remove();
+  const { restCard, restTableWrapper } = buildRestSection(lastRestNumbers);
   matchListElement.appendChild(restCard);
   matchListElement.appendChild(restTableWrapper);
 }
@@ -322,61 +320,9 @@ function renderMatches(courtCount) {
   });
 
   if (restNumbers.length > 0 || nextNumber > (activeNumbers.length)) {
-    const restCard = document.createElement("div"); // 休憩者情報を表示するカード要素
-    restCard.className = "rest-card";
-
-    const restTitle = document.createElement("p"); // 「休憩者」というタイトル要素
-    restTitle.className = "match-title";
-    restTitle.textContent = "休憩者";
-
-    const restMembers = document.createElement("p"); // 休憩者のプレイヤー番号を表示する要素
-    restMembers.className = "match-text";
-    restMembers.textContent = restNumbers.join(", ");
-
-    const restTableWrapper = document.createElement("div"); // 休憩回数表を囲む外枠
-    restTableWrapper.className = "rest-table-wrapper";
-    const restTableTitle = document.createElement("p"); // 「休憩回数表」というタイトル
-    restTableTitle.className = "rest-table-title";
-    restTableTitle.textContent = "休憩回数表";
-    const restTable = document.createElement("table"); // 休憩回数を表示するテーブル
-    restTable.className = "rest-table";
-
-    const headerRow = document.createElement("tr"); // テーブルのヘッダー行
-    const headerNumber = document.createElement("th"); // 「番号」列ヘッダー
-    headerNumber.textContent = "番号";
-    const headerCount = document.createElement("th"); // 「回数」列ヘッダー
-    headerCount.textContent = "回数";
-    headerRow.appendChild(headerNumber);
-    headerRow.appendChild(headerCount);
-    restTable.appendChild(headerRow);
-
-    const maxNumberToShow = Math.max(nextNumber - 1, totalCount);
-    for (let number = 1; number <= maxNumberToShow; number += 1) {
-      const row = document.createElement("tr");
-      const numberCell = document.createElement("td");
-      if (retiredSet.has(number)) {
-        numberCell.textContent = `${number}番（途中退場）`;
-        numberCell.className = "retired";
-      } else if (!activeNumbers.includes(number)) {
-        numberCell.textContent = `${number}番（未参加）`;
-      } else {
-        numberCell.textContent = `${number}番`;
-      }
-
-      ensureRestCountExists(number);
-      const countCell = document.createElement("td");
-      countCell.textContent = `${restCounts[number]}回`;
-      row.appendChild(numberCell);
-      row.appendChild(countCell);
-      restTable.appendChild(row);
-    }
-
-    restCard.appendChild(restTitle);
-    restCard.appendChild(restMembers);
+    lastRestNumbers = [...restNumbers];
+    const { restCard, restTableWrapper } = buildRestSection(restNumbers);
     matchListElement.appendChild(restCard);
-
-    restTableWrapper.appendChild(restTableTitle);
-    restTableWrapper.appendChild(restTable);
     matchListElement.appendChild(restTableWrapper);
   }
 }
