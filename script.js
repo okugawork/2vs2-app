@@ -13,6 +13,9 @@ const pendingNotice = document.getElementById("pendingNotice"); // 追加/退場
 const confirmModal = document.getElementById("confirmModal");
 const confirmCreateButton = document.getElementById("confirmCreateButton");
 const cancelCreateButton = document.getElementById("cancelCreateButton");
+const resetConfirmModal = document.getElementById("resetConfirmModal");
+const confirmResetButton = document.getElementById("confirmResetButton");
+const cancelResetButton = document.getElementById("cancelResetButton");
 const tabMatch = document.getElementById("tabMatch");
 const tabHistory = document.getElementById("tabHistory");
 const tabStats = document.getElementById("tabStats");
@@ -21,8 +24,16 @@ const screenHistory = document.getElementById("screen-history");
 const screenStats = document.getElementById("screen-stats");
 const summaryParticipants = document.getElementById("summaryParticipants");
 const summaryCourts = document.getElementById("summaryCourts");
-const summaryRestCount = document.getElementById("summaryRestCount");
-const summaryNextMatch = document.getElementById("summaryNextMatch");
+const summaryRestMembers = document.getElementById("summaryRestMembers");
+const panelSummary = document.querySelector(".panel-summary");
+const panelControls = document.querySelector(".panel-controls");
+const nextMatchZone = document.querySelector(".next-match-zone");
+const actionGroup = document.querySelector(".action-group");
+const midControls = document.querySelector(".mid-controls");
+const metaInfo = document.querySelector(".meta-info");
+const liveControlsZone = document.getElementById("liveControlsZone");
+const tabBar = document.querySelector(".tab-bar");
+const statsRestTable = document.getElementById("statsRestTable");
 
 // === ゲーム状態管理用変数 ===
 let restCounts = []; // 各プレイヤーの休憩回数を記録する配列（インデックス = プレイヤー番号）
@@ -34,20 +45,74 @@ let activeNumbers = []; // 現在参加中のプレイヤー番号の配列
 let retiredSet = new Set(); // 途中退場（廃番）になった番号の集合
 let nextNumber = 1; // 次に割り当てる番号
 let lastRestNumbers = []; // 直近で作成された休憩者リスト（表示用）
+let pendingNotices = []; // 次回反映される追加/除外メッセージの配列
+
+function renderPendingNotices() {
+  if (!pendingNotice) return;
+  pendingNotice.textContent = "";
+  pendingNotices.forEach((notice, index) => {
+    const line = document.createElement("span");
+    line.textContent = notice.text;
+    if (notice.type === "remove") {
+      line.classList.add("pending-notice-remove");
+    }
+    pendingNotice.appendChild(line);
+    if (index < pendingNotices.length - 1) {
+      pendingNotice.appendChild(document.createElement("br"));
+    }
+  });
+}
 
 // 入力欄のロック/ロック解除を行います。
 function setControlsLocked(locked) {
   participantCountSelect.disabled = locked;
   courtCountInput.disabled = locked;
-  // mid-controls (add/remove) are only visible and enabled when controls are locked
-  const mid = document.querySelector(".mid-controls");
-  if (mid) {
-    mid.style.display = locked ? "flex" : "none";
+  if (midControls) {
+    midControls.style.display = locked ? "flex" : "none";
+  }
+  if (resetButton) {
+    resetButton.style.display = locked ? "inline-flex" : "none";
   }
   addParticipantButton.disabled = !locked;
   removeParticipantSelect.disabled = !locked;
   removeParticipantButton.disabled = !locked;
+  if (!locked && removeParticipantSelect) {
+    removeParticipantSelect.style.display = "none";
+    removeParticipantSelect.value = "";
+    removeParticipantButton.textContent = "除外";
+  }
   if (locked) updateRemoveSelect();
+  updateModeLayout();
+}
+
+function moveControlsToSummary() {
+  if (!liveControlsZone || !actionGroup || !midControls) return;
+  liveControlsZone.appendChild(actionGroup);
+  liveControlsZone.appendChild(midControls);
+}
+
+function moveControlsToSetup() {
+  if (!panelControls || !actionGroup || !midControls || !metaInfo) return;
+  panelControls.insertBefore(actionGroup, metaInfo);
+  panelControls.insertBefore(midControls, metaInfo);
+}
+
+function updateModeLayout() {
+  const setupMode = !isLocked;
+
+  if (setupMode) {
+    moveControlsToSetup();
+  } else {
+    moveControlsToSummary();
+  }
+
+  if (panelSummary) panelSummary.classList.toggle("hidden-panel", setupMode);
+  if (panelControls) panelControls.classList.toggle("hidden-panel", !setupMode);
+  if (tabBar) tabBar.classList.toggle("hidden-panel", setupMode);
+
+  if (setupMode && tabMatch && screenMatch) {
+    activateTab(tabMatch, screenMatch);
+  }
 }
 
 // 休憩回数管理用の配列を初期化します。
@@ -119,6 +184,7 @@ function updateRemoveSelect() {
   }
   // disable if no active numbers
   removeParticipantSelect.disabled = activeNumbers.length === 0 || !isLocked;
+  removeParticipantSelect.style.display = removeParticipantSelect.disabled ? "none" : removeParticipantSelect.style.display;
 }
 
 // 配列をシャッフルするユーティリティ関数です。
@@ -217,25 +283,9 @@ function createMatches(courtCount) {
   return { matches, restNumbers };
 }
 
-function buildRestSection(restNumbers) {
+function buildRestTable() {
   const maxNumberToShow = Math.max(nextNumber - 1, activeNumbers.length);
 
-  const restCard = document.createElement('div');
-  restCard.className = 'rest-card';
-  const restTitle = document.createElement('p');
-  restTitle.className = 'match-title';
-  restTitle.textContent = '休憩者';
-  const restMembers = document.createElement('p');
-  restMembers.className = 'match-text';
-  restMembers.textContent = restNumbers.length > 0 ? restNumbers.join(', ') : '';
-  restCard.appendChild(restTitle);
-  restCard.appendChild(restMembers);
-
-  const restTableWrapper = document.createElement('div');
-  restTableWrapper.className = 'rest-table-wrapper';
-  const restTableTitle = document.createElement('p');
-  restTableTitle.className = 'rest-table-title';
-  restTableTitle.textContent = '休憩回数表';
   const restTable = document.createElement('table');
   restTable.className = 'rest-table';
 
@@ -267,20 +317,14 @@ function buildRestSection(restNumbers) {
     restTable.appendChild(row);
   }
 
-  restTableWrapper.appendChild(restTableTitle);
-  restTableWrapper.appendChild(restTable);
-
-  return { restCard, restTableWrapper };
+  return restTable;
 }
 
 function renderRestTable() {
-  const existingWrapper = document.querySelector('.rest-table-wrapper');
-  const existingRestCard = document.querySelector('.rest-card');
-  if (existingWrapper) existingWrapper.remove();
-  if (existingRestCard) existingRestCard.remove();
-  const { restCard, restTableWrapper } = buildRestSection(lastRestNumbers);
-  matchListElement.appendChild(restCard);
-  matchListElement.appendChild(restTableWrapper);
+  if (!statsRestTable) return;
+  statsRestTable.innerHTML = '';
+  const restTable = buildRestTable();
+  statsRestTable.appendChild(restTable);
 }
 
 // 結果表示と状態を初期化します。
@@ -290,7 +334,9 @@ function resetResults() {
   matchListElement.innerHTML = "";
   previousPairKeys = [];
   modeHint.textContent = "初回のペア作成前に人数とコート数を変更できます。変更する場合は「リセット」を押してください。";
-  if (pendingNotice) pendingNotice.textContent = "";
+  pendingNotices = [];
+  renderPendingNotices();
+  if (summaryRestMembers) summaryRestMembers.textContent = "";
 }
 
 // 画面に試合結果を表示する関数です。
@@ -300,18 +346,18 @@ function renderMatches(courtCount) {
   const safeCourtCount = Math.max(1, Number(courtCount) || 1);
   const totalCount = activeNumbers.length;
   // ペア作成時は保留メッセージを消す
-  if (pendingNotice) pendingNotice.textContent = "";
+  pendingNotices = [];
+  renderPendingNotices();
   const { matches, restNumbers } = createMatches(courtCount);
 
   resultSummary.classList.remove("empty-state");
-  resultSummary.textContent = `${totalCount}人で${safeCourtCount}コート、${matches.length}試合を作成しました。`;
+  resultSummary.textContent = "";
   matchListElement.innerHTML = "";
   modeHint.textContent = "人数とコート数を変更するには「リセット」を押してください。";
 
   if (summaryParticipants) summaryParticipants.textContent = `${totalCount}人`;
   if (summaryCourts) summaryCourts.textContent = `${safeCourtCount}コート`;
-  if (summaryRestCount) summaryRestCount.textContent = restNumbers.length > 0 ? `${restNumbers.length}` : "0";
-  if (summaryNextMatch) summaryNextMatch.textContent = `${matches.length}試合`;
+  if (summaryRestMembers) summaryRestMembers.textContent = restNumbers.length > 0 ? restNumbers.join(', ') : 'なし';
 
   if (safeCourtCount > Math.floor(totalCount / 4)) {
     const warning = document.createElement("p"); // 警告メッセージ要素を作成
@@ -337,12 +383,8 @@ function renderMatches(courtCount) {
     matchListElement.appendChild(card);
   });
 
-  if (restNumbers.length > 0 || nextNumber > (activeNumbers.length)) {
-    lastRestNumbers = [...restNumbers];
-    const { restCard, restTableWrapper } = buildRestSection(restNumbers);
-    matchListElement.appendChild(restCard);
-    matchListElement.appendChild(restTableWrapper);
-  }
+  lastRestNumbers = [...restNumbers];
+  renderRestTable();
 }
 
 function handleCreateMatches() {
@@ -369,6 +411,33 @@ function showCreateConfirm() {
 function hideCreateConfirm() {
   if (confirmModal) {
     confirmModal.classList.add("hidden");
+  }
+}
+
+function handleReset() {
+  isLocked = false;
+  previousPairKeys = [];
+  setControlsLocked(false);
+  activeNumbers = [];
+  retiredSet = new Set();
+  nextNumber = 1;
+  restCounts = [];
+  lastRestNumbers = [];
+  resetResults();
+  renderRestTable();
+}
+
+function showResetConfirm() {
+  if (!resetConfirmModal) {
+    handleReset();
+    return;
+  }
+  resetConfirmModal.classList.remove("hidden");
+}
+
+function hideResetConfirm() {
+  if (resetConfirmModal) {
+    resetConfirmModal.classList.add("hidden");
   }
 }
 
@@ -419,12 +488,21 @@ if (tabStats) {
 
 // リセットボタンが押されたときの処理です。
 resetButton.addEventListener("click", () => {
-  isLocked = false;
-  previousPairKeys = [];
-  setControlsLocked(false);
-  initializeParticipants(Number(participantCountSelect.value));
-  resetResults();
+  showResetConfirm();
 });
+
+if (confirmResetButton) {
+  confirmResetButton.addEventListener("click", () => {
+    hideResetConfirm();
+    handleReset();
+  });
+}
+
+if (cancelResetButton) {
+  cancelResetButton.addEventListener("click", () => {
+    hideResetConfirm();
+  });
+}
 
 // 途中参加: 新しい番号を追加する（追加時に確認ダイアログ）
 addParticipantButton.addEventListener("click", () => {
@@ -442,14 +520,23 @@ addParticipantButton.addEventListener("click", () => {
   modeHint.textContent = `番号${assigned}を追加しました。ペア作成を押すと反映されます。`;
   // 休憩回数表だけを更新（試合作成は行わない）
   renderRestTable();
-  if (pendingNotice) pendingNotice.textContent = `次の試合から${assigned}番さんが参加します。`;
+  pendingNotices.push({ text: `次から${assigned}番が参加します。`, type: "add" });
+  renderPendingNotices();
 });
 
-// 途中退場: 指定番号を廃番（永久除外）にする
+// メンバー除外: まず選択欄を出し、選択後に除外します
 removeParticipantButton.addEventListener("click", () => {
+  if (!isLocked) return;
+  if (removeParticipantSelect && removeParticipantSelect.style.display === "none") {
+    removeParticipantSelect.style.display = "block";
+    removeParticipantSelect.focus();
+    removeParticipantButton.textContent = "除外する";
+    return;
+  }
+
   const value = Number(removeParticipantSelect.value);
   if (!value || value <= 0) {
-    alert("有効な番号を入力してください");
+    alert("除外するメンバーを選んでください");
     return;
   }
   if (retiredSet.has(value)) {
@@ -468,10 +555,17 @@ removeParticipantButton.addEventListener("click", () => {
   modeHint.textContent = `番号${value}を途中退場（廃番）にしました。ペア作成を押すと反映されます。`;
   // 休憩回数表だけを更新（試合作成は行わない）
   renderRestTable();
-  if (pendingNotice) pendingNotice.textContent = `${value}番さんが次の試合から退場します。`;
+  pendingNotices.push({ text: `次から${value}番が除外されます。`, type: "remove" });
+  renderPendingNotices();
+  if (removeParticipantSelect) {
+    removeParticipantSelect.style.display = "none";
+    removeParticipantSelect.value = "";
+  }
+  removeParticipantButton.textContent = "除外";
 });
 
 // 最初に画面を初期状態にします。
 resetResults();
 setControlsLocked(false);
+renderRestTable();
 if (tabMatch) activateTab(tabMatch, screenMatch);
