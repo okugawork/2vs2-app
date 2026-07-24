@@ -886,18 +886,19 @@ button:disabled {
 }
 
 .history-card {
-  background: #fff;
-  border: 1px solid #e4e9f8;
-  border-radius: 16px;
-  padding: 12px;
-  box-shadow: 0 10px 22px rgba(30, 41, 59, 0.07);
+  background: linear-gradient(180deg, #ffffff 0%, #fcfdff 100%);
+  border: 1px solid #e6ebfb;
+  border-radius: 18px;
+  padding: 14px;
+  box-shadow: 0 12px 26px rgba(30, 41, 59, 0.08);
   animation: riseIn 0.28s ease-out both;
 }
 
 .history-top {
-  margin-bottom: 8px;
+  margin-bottom: 10px;
   font-weight: 800;
   color: #111827;
+  font-size: 1.02rem;
 }
 
 .history-courts {
@@ -906,18 +907,27 @@ button:disabled {
 }
 
 .history-court-card {
-  border: 1px solid #e5ebfb;
-  border-radius: 12px;
-  padding: 10px;
+  border: 1px solid #dfe7fb;
+  border-radius: 14px;
+  padding: 12px;
+  display: grid;
+  grid-template-columns: minmax(0, 1.1fr) minmax(210px, 0.92fr);
+  gap: 12px;
+  align-items: stretch;
+  background: linear-gradient(180deg, #ffffff 0%, #fbfcff 100%);
+}
+
+.history-court-main {
+  min-width: 0;
 }
 
 .history-label {
   display: inline-flex;
   align-items: center;
   border-radius: 999px;
-  background: #e6ebff;
-  color: #3f48c6;
-  padding: 3px 9px;
+  background: #edf1ff;
+  color: #3a45c8;
+  padding: 4px 10px;
   font-size: 0.8rem;
   font-weight: 700;
 }
@@ -929,9 +939,157 @@ button:disabled {
 .history-court-match {
   margin: 0;
   font-family: var(--font-display);
-  font-size: 1.02rem;
+  font-size: 1.08rem;
   font-weight: 900;
   color: #111827;
+}
+
+.history-court-meta {
+  margin: 8px 0 0;
+  color: #64748b;
+  font-size: 0.84rem;
+}
+
+.history-score-panel {
+  border-radius: 14px;
+  background: linear-gradient(180deg, #fbfcff 0%, #eff3ff 100%);
+  border: 1px solid #dfe7fb;
+  padding: 12px;
+  display: grid;
+  gap: 10px;
+  align-content: start;
+}
+
+.history-score-panel.winner-a {
+  background: linear-gradient(180deg, #f2fff5 0%, #e6f8eb 100%);
+  border-color: #d1ecd8;
+}
+
+.history-score-panel.winner-b {
+  background: linear-gradient(180deg, #fff8f0 0%, #fff0df 100%);
+  border-color: #f0dac0;
+}
+
+.history-score-panel.draw {
+  background: linear-gradient(180deg, #f8fafc 0%, #eef2ff 100%);
+}
+
+.history-score-panel.winner-a .history-score-input-wrap:first-child input {
+  background: linear-gradient(180deg, #e7f8ed 0%, #dff3e5 100%);
+  border-color: #cfe9d7;
+  color: #1b8f49;
+}
+
+.history-score-panel.winner-a .history-score-input-wrap:last-of-type input {
+  background: linear-gradient(180deg, #f4f5fb 0%, #edf0f9 100%);
+  color: #475569;
+}
+
+.history-score-panel.winner-b .history-score-input-wrap:first-child input {
+  background: linear-gradient(180deg, #f4f5fb 0%, #edf0f9 100%);
+  color: #475569;
+}
+
+.history-score-panel.winner-b .history-score-input-wrap:last-of-type input {
+  background: linear-gradient(180deg, #fff0df 0%, #ffe7cc 100%);
+  border-color: #f1d0a7;
+  color: #ea7a12;
+}
+
+.history-score-panel.draw .history-score-input-wrap input {
+  background: linear-gradient(180deg, #f4f5fb 0%, #eef1f8 100%);
+  color: #1b2b6a;
+}
+
+.history-score-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.84rem;
+  font-weight: 800;
+  color: #1f2937;
+}
+
+.history-score-status.winner-a {
+  color: #129142;
+}
+
+.history-score-status.winner-b {
+  color: #ea7a12;
+}
+
+.history-score-status.draw {
+  color: #334155;
+}
+
+.history-score-status.empty {
+  color: #64748b;
+}
+
+.history-score-trophy {
+  font-size: 1rem;
+  line-height: 1;
+}
+
+.history-score-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 10px;
+}
+
+.history-score-chevron {
+  color: #64748b;
+  font-size: 1.5rem;
+  line-height: 1;
+  font-weight: 700;
+  padding-left: 6px;
+}
+
+.history-score-form {
+  display: grid;
+  gap: 8px;
+}
+
+.history-score-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+  gap: 10px;
+  align-items: center;
+}
+
+.history-score-input-wrap {
+  display: grid;
+  gap: 0;
+  font-size: 0;
+  color: transparent;
+}
+
+.history-score-input-wrap input {
+  width: 100%;
+  border: 1px solid #e1e6f4;
+  border-radius: 14px;
+  background: linear-gradient(180deg, #f8f9fe 0%, #eef1f8 100%);
+  padding: 12px 10px;
+  font: inherit;
+  font-size: 1.8rem;
+  font-weight: 900;
+  color: #1b2b6a;
+  text-align: center;
+  box-shadow: inset 0 -1px 0 rgba(255, 255, 255, 0.7);
+}
+
+.history-score-input-wrap input:focus {
+  outline: none;
+  border-color: #7b80ff;
+  box-shadow: 0 0 0 3px rgba(123, 128, 255, 0.14), inset 0 -1px 0 rgba(255, 255, 255, 0.7);
+}
+
+.history-score-dash {
+  font-size: 1.5rem;
+  font-weight: 900;
+  color: #64748b;
+  padding-top: 8px;
 }
 
 .history-rest {
@@ -983,6 +1141,86 @@ button:disabled {
 
 .stats-rest-table {
   overflow-x: auto;
+}
+
+.stats-member-selector {
+  margin-bottom: 12px;
+}
+
+.stats-member-selector select {
+  width: 100%;
+  border: 1px solid #dbe3f7;
+  border-radius: 12px;
+  background: linear-gradient(180deg, #ffffff 0%, #f6f9ff 100%);
+  color: #334155;
+  font: inherit;
+  font-size: 0.9rem;
+  font-weight: 700;
+  padding: 10px 12px;
+  outline: none;
+}
+
+.stats-member-selector select:focus {
+  border-color: #7b80ff;
+  box-shadow: 0 0 0 3px rgba(123, 128, 255, 0.16);
+}
+
+.history-filter {
+  margin: 0 0 12px;
+}
+
+.history-filter select {
+  width: 100%;
+  border: 1px solid #dbe3f7;
+  border-radius: 12px;
+  background: linear-gradient(180deg, #ffffff 0%, #f6f9ff 100%);
+  color: #334155;
+  font: inherit;
+  font-size: 0.9rem;
+  font-weight: 700;
+  padding: 10px 12px;
+  outline: none;
+}
+
+.history-filter select:focus {
+  border-color: #7b80ff;
+  box-shadow: 0 0 0 3px rgba(123, 128, 255, 0.16);
+}
+
+.stats-member-detail-wrap {
+  overflow-x: auto;
+}
+
+.stats-member-detail {
+  display: grid;
+  gap: 8px;
+}
+
+.stats-member-detail-title {
+  margin: 0;
+  color: #1f2e7f;
+  font-size: 0.96rem;
+  font-weight: 800;
+}
+
+.stats-member-detail-empty {
+  margin: 0;
+  color: #64748b;
+  font-size: 0.92rem;
+}
+
+.stats-member-detail-table {
+  overflow-x: auto;
+}
+
+.stats-ranking-area {
+  display: grid;
+  gap: 12px;
+}
+
+.ranking-section {
+  display: grid;
+  gap: 8px;
 }
 
 .rest-table {
@@ -1116,6 +1354,22 @@ button:disabled {
 
   .field-grid {
     grid-template-columns: 1fr;
+  }
+
+  .history-court-card {
+    grid-template-columns: 1fr;
+  }
+
+  .history-score-actions {
+    grid-template-columns: 1fr;
+  }
+
+  .history-score-note {
+    text-align: left;
+  }
+
+  .history-score-grid {
+    grid-template-columns: 1fr auto 1fr;
   }
 }
 

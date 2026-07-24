@@ -39,13 +39,25 @@ const midControls = document.querySelector(".mid-controls");
 const metaInfo = document.querySelector(".meta-info");
 const liveControlsZone = document.getElementById("liveControlsZone");
 const tabBar = document.querySelector(".tab-bar");
+const historyMemberSelect = document.getElementById("historyMemberSelect");
 const statsRestTable = document.getElementById("statsRestTable");
+const statsMemberSelect = document.getElementById("statsMemberSelect");
+const statsMemberDetail = document.getElementById("statsMemberDetail");
+const statsOpponentSelect = document.getElementById("statsOpponentSelect");
+const statsOpponentDetail = document.getElementById("statsOpponentDetail");
+const statsRankingArea = document.getElementById("statsRankingArea");
 const nextMatchZone = document.querySelector(".next-match-zone");
 
 // === ゲーム状態管理用変数 ===
 let restCounts = []; // 各プレイヤーの休憩回数を記録する配列（インデックス = プレイヤー番号）
 let isLocked = false; // ペア作成後に人数・コート数の変更を禁止するフラグ
-let previousPairKeys = []; // 前回作成時のペア組み合わせを保存（今回と同じペアを避けるため）
+let pairCounts = {}; // ペアごとの累積回数を記録するオブジェクト
+let pairHistoryByMember = {}; // メンバーごとのペア履歴を記録するオブジェクト
+let opponentCounts = {}; // ペア同士の対戦回数を記録するオブジェクト
+let opponentHistoryByMember = {}; // メンバーごとの対戦相手履歴を記録するオブジェクト
+let selectedMemberNumber = null;
+let selectedOpponentMemberNumber = null;
+let selectedHistoryMemberNumber = null;
 
 // 途中参加/途中退場管理
 let activeNumbers = []; // 現在参加中のプレイヤー番号の配列
@@ -126,8 +138,201 @@ function formatMatchStartTime(timestamp) {
   return `${hh}:${mi}`;
 }
 
+function formatSavedScore(scoreA, scoreB) {
+  if (scoreA === null || scoreB === null || scoreA === undefined || scoreB === undefined) {
+    return "未入力";
+  }
+  if (scoreA === scoreB) {
+    return "引き分け";
+  }
+  return scoreA > scoreB ? "A の勝利" : "B の勝利";
+}
+
+function formatTeamNames(team) {
+  return (team || []).join(", ");
+}
+
+function parseScoreInput(value) {
+  if (value === "" || value === null || value === undefined) return 0;
+  const parsed = Number(value);
+  if (!Number.isInteger(parsed) || parsed < 0) return null;
+  return parsed;
+}
+
+function normalizeScoreInputField(input) {
+  input.value = input.value.replace(/\D/g, "").slice(0, 2);
+}
+
+function saveCourtScore(round, courtIndex, inputA, inputB) {
+  const entry = historyEntries.find((item) => item.type === "match" && item.round === round);
+  if (!entry || !entry.courts || !entry.courts[courtIndex - 1]) return;
+
+  const scoreA = parseScoreInput(inputA);
+  const scoreB = parseScoreInput(inputB);
+
+  if (scoreA === null || scoreB === null) return;
+
+  const court = entry.courts[courtIndex - 1];
+  const hasScoreInput = inputA !== "" || inputB !== "";
+  if (court.scoreA === scoreA && court.scoreB === scoreB && court.hasScoreInput === hasScoreInput) return;
+
+  court.scoreA = scoreA;
+  court.scoreB = scoreB;
+  court.hasScoreInput = hasScoreInput;
+  delete court.updatedAt;
+  renderHistoryList();
+  renderRankingStats();
+}
+
+function normalizeHistoryCourtScores() {
+  historyEntries.forEach((entry) => {
+    if (entry.type !== "match" || !entry.courts) return;
+    entry.courts.forEach((court) => {
+      if (court.scoreA === null || court.scoreA === undefined) {
+        court.scoreA = 0;
+      }
+      if (court.scoreB === null || court.scoreB === undefined) {
+        court.scoreB = 0;
+      }
+      if (court.hasScoreInput === undefined) {
+        court.hasScoreInput = false;
+      }
+      if (court.updatedAt) {
+        delete court.updatedAt;
+      }
+    });
+  });
+}
+
+function buildCourtScorePanel(entry, court, courtIndex) {
+  const panel = document.createElement("div");
+  panel.className = "history-score-panel";
+
+  const hasScore = court.hasScoreInput === true;
+  if (hasScore) {
+    if (court.scoreA > court.scoreB) {
+      panel.classList.add("winner-a");
+    } else if (court.scoreB > court.scoreA) {
+      panel.classList.add("winner-b");
+    } else {
+      panel.classList.add("draw");
+    }
+  }
+
+  const header = document.createElement("div");
+  header.className = "history-score-header";
+
+  const status = document.createElement("div");
+  status.className = "history-score-status";
+  const trophy = document.createElement("span");
+  trophy.className = "history-score-trophy";
+  trophy.textContent = "🏆";
+  status.appendChild(trophy);
+
+  const statusText = document.createElement("span");
+  if (hasScore) {
+    const winnerTeam = court.scoreA > court.scoreB ? court.teamA : court.scoreB > court.scoreA ? court.teamB : null;
+    statusText.textContent = court.scoreA === court.scoreB
+      ? "引き分け"
+      : `${formatTeamNames(winnerTeam)} の勝利`;
+    status.classList.add(court.scoreA === court.scoreB ? "draw" : court.scoreA > court.scoreB ? "winner-a" : "winner-b");
+  } else {
+    statusText.textContent = "点数未入力";
+    status.classList.add("empty");
+  }
+  status.appendChild(statusText);
+
+  header.appendChild(status);
+  panel.appendChild(header);
+
+  const form = document.createElement("form");
+  form.className = "history-score-form";
+  const commit = () => saveCourtScore(entry.round, courtIndex, inputA.value, inputB.value);
+  let autoSaveTimer = null;
+  const queueAutoSave = () => {
+    window.clearTimeout(autoSaveTimer);
+    autoSaveTimer = window.setTimeout(() => {
+      if (form.contains(document.activeElement)) return;
+      commit();
+    }, 180);
+  };
+  form.addEventListener("submit", (event) => {
+    event.preventDefault();
+    commit();
+  });
+
+  const scoreGrid = document.createElement("div");
+  scoreGrid.className = "history-score-grid";
+
+  const inputAWrap = document.createElement("label");
+  inputAWrap.className = "history-score-input-wrap";
+  inputAWrap.setAttribute("aria-label", "Aの点数");
+  const inputA = document.createElement("input");
+  inputA.type = "text";
+  inputA.min = "0";
+  inputA.inputMode = "numeric";
+  inputA.maxLength = 2;
+  inputA.pattern = "[0-9]*";
+  inputA.placeholder = "0";
+  inputA.value = court.hasScoreInput ? String(court.scoreA ?? 0) : "";
+  inputA.addEventListener("input", () => {
+    normalizeScoreInputField(inputA);
+    queueAutoSave();
+  });
+  inputA.addEventListener("blur", (event) => {
+    if (event.relatedTarget && form.contains(event.relatedTarget)) return;
+    queueAutoSave();
+  });
+  inputA.addEventListener("keydown", (event) => {
+    if (event.key === "Enter") commit();
+  });
+  inputAWrap.appendChild(inputA);
+
+  const dash = document.createElement("span");
+  dash.className = "history-score-dash";
+  dash.textContent = "-";
+
+  const inputBWrap = document.createElement("label");
+  inputBWrap.className = "history-score-input-wrap";
+  inputBWrap.setAttribute("aria-label", "Bの点数");
+  const inputB = document.createElement("input");
+  inputB.type = "text";
+  inputB.min = "0";
+  inputB.inputMode = "numeric";
+  inputB.maxLength = 2;
+  inputB.pattern = "[0-9]*";
+  inputB.placeholder = "0";
+  inputB.value = court.hasScoreInput ? String(court.scoreB ?? 0) : "";
+  inputB.addEventListener("input", () => {
+    normalizeScoreInputField(inputB);
+    queueAutoSave();
+  });
+  inputB.addEventListener("blur", (event) => {
+    if (event.relatedTarget && form.contains(event.relatedTarget)) return;
+    queueAutoSave();
+  });
+  inputB.addEventListener("keydown", (event) => {
+    if (event.key === "Enter") commit();
+  });
+  inputBWrap.appendChild(inputB);
+
+  scoreGrid.appendChild(inputAWrap);
+  scoreGrid.appendChild(dash);
+  scoreGrid.appendChild(inputBWrap);
+
+  form.appendChild(scoreGrid);
+  panel.appendChild(form);
+  return panel;
+}
+
+function historyCourtIncludesMember(court, memberNumber) {
+  const teamA = court.teamA || [];
+  const teamB = court.teamB || [];
+  return teamA.includes(memberNumber) || teamB.includes(memberNumber);
+}
+
 // 1回のペア作成結果（第n試合）を履歴カードDOMに変換します。
-function buildHistoryCard(entry) {
+function buildHistoryCard(entry, filterMemberNumber = null) {
   const item = document.createElement("article");
   item.className = "timeline-item";
 
@@ -153,9 +358,22 @@ function buildHistoryCard(entry) {
   const courtList = document.createElement("div");
   courtList.className = "history-courts";
 
-  entry.courts.forEach((court) => {
+  const visibleCourts = filterMemberNumber === null
+    ? entry.courts.map((court, courtIndex) => ({ court, courtIndex }))
+    : entry.courts
+      .map((court, courtIndex) => ({ court, courtIndex }))
+      .filter(({ court }) => historyCourtIncludesMember(court, filterMemberNumber));
+
+  if (visibleCourts.length === 0) {
+    return null;
+  }
+
+  visibleCourts.forEach(({ court, courtIndex }) => {
     const courtCard = document.createElement("div");
     courtCard.className = "history-court-card";
+
+    const courtMain = document.createElement("div");
+    courtMain.className = "history-court-main";
 
     const courtTitle = document.createElement("p");
     courtTitle.className = "history-label history-court-title";
@@ -166,22 +384,82 @@ function buildHistoryCard(entry) {
     courtMatch.className = "history-court-match";
     courtMatch.textContent = court.text;
 
-    courtCard.appendChild(courtTitle);
-    courtCard.appendChild(courtMatch);
+    courtMain.appendChild(courtTitle);
+    courtMain.appendChild(courtMatch);
+
+    courtCard.appendChild(courtMain);
+    courtCard.appendChild(buildCourtScorePanel(entry, court, courtIndex + 1));
     courtList.appendChild(courtCard);
   });
 
   card.appendChild(courtList);
 
-  const rest = document.createElement("p");
-  rest.className = "history-rest";
-  rest.textContent = `休憩: ${entry.restNumbers.length > 0 ? entry.restNumbers.join(", ") : "なし"}`;
-  card.appendChild(rest);
+  if (filterMemberNumber === null) {
+    const rest = document.createElement("p");
+    rest.className = "history-rest";
+    rest.textContent = `休憩: ${entry.restNumbers.length > 0 ? entry.restNumbers.join(", ") : "なし"}`;
+    card.appendChild(rest);
+  }
 
   item.appendChild(time);
   item.appendChild(dot);
   item.appendChild(card);
   return item;
+}
+
+function historyEntryIncludesMember(entry, memberNumber) {
+  if (!entry) return false;
+
+  if (entry.type === "match" && entry.courts) {
+    return entry.courts.some((court) => {
+      const teamA = court.teamA || [];
+      const teamB = court.teamB || [];
+      return teamA.includes(memberNumber) || teamB.includes(memberNumber);
+    });
+  }
+
+  if (entry.type === "member-change" && Array.isArray(entry.changes)) {
+    return entry.changes.some((change) => change.number === memberNumber);
+  }
+
+  return false;
+}
+
+function renderHistoryFilter() {
+  if (!historyMemberSelect) return;
+
+  const memberNumbers = getTrackedMemberNumbers();
+  const previousValue = selectedHistoryMemberNumber === null ? "" : String(selectedHistoryMemberNumber);
+
+  historyMemberSelect.innerHTML = "";
+
+  const allOption = document.createElement("option");
+  allOption.value = "";
+  allOption.textContent = "全件表示";
+  historyMemberSelect.appendChild(allOption);
+
+  memberNumbers.forEach((memberNumber) => {
+    const option = document.createElement("option");
+    option.value = String(memberNumber);
+    option.textContent = retiredSet.has(memberNumber) ? `${memberNumber}番（途中退場）` : `${memberNumber}番`;
+    historyMemberSelect.appendChild(option);
+  });
+
+  if (previousValue && memberNumbers.includes(Number(previousValue))) {
+    historyMemberSelect.value = previousValue;
+    selectedHistoryMemberNumber = Number(previousValue);
+  } else {
+    historyMemberSelect.value = "";
+    selectedHistoryMemberNumber = null;
+  }
+
+  if (!historyMemberSelect.dataset.bound) {
+    historyMemberSelect.addEventListener("change", () => {
+      selectedHistoryMemberNumber = historyMemberSelect.value === "" ? null : Number(historyMemberSelect.value);
+      renderHistoryList();
+    });
+    historyMemberSelect.dataset.bound = "true";
+  }
 }
 
 // 途中参加/除外の変更履歴を履歴カードDOMに変換します。
@@ -224,22 +502,33 @@ function buildMemberChangeCard(entry) {
 // 履歴タブの一覧を最新順で再描画します。
 function renderHistoryList() {
   if (!historyList) return;
+  normalizeHistoryCourtScores();
+  renderHistoryFilter();
   historyList.innerHTML = "";
 
-  if (historyEntries.length === 0) {
+  const filterMemberNumber = selectedHistoryMemberNumber;
+  const filteredEntries = historyEntries.filter((entry) => {
+    if (filterMemberNumber === null) return true;
+    return historyEntryIncludesMember(entry, filterMemberNumber);
+  });
+
+  if (filteredEntries.length === 0) {
     const emptyCard = document.createElement("article");
     emptyCard.className = "history-card";
     const emptyText = document.createElement("p");
     emptyText.className = "history-rest";
-    emptyText.textContent = "まだ履歴はありません。試合を作成するとここに表示されます。";
+    emptyText.textContent = filterMemberNumber === null
+      ? "まだ履歴はありません。試合を作成するとここに表示されます。"
+      : `${filterMemberNumber}番が参加した履歴はまだありません。`;
     emptyCard.appendChild(emptyText);
     historyList.appendChild(emptyCard);
     return;
   }
 
-  [...historyEntries].reverse().forEach((entry) => {
+  [...filteredEntries].reverse().forEach((entry) => {
     if (entry.type === "match") {
-      historyList.appendChild(buildHistoryCard(entry));
+      const card = buildHistoryCard(entry, filterMemberNumber);
+      if (card) historyList.appendChild(card);
       return;
     }
     historyList.appendChild(buildMemberChangeCard(entry));
@@ -316,12 +605,64 @@ function initializeParticipants(initialCount) {
   restCounts = [];
   for (let i = 1; i < nextNumber; i += 1) {
     restCounts[i] = 0;
+    ensurePairHistoryExists(i);
   }
   updateRemoveSelect();
 }
 
 function ensureRestCountExists(number) {
   if (restCounts[number] === undefined) restCounts[number] = 0;
+}
+
+function ensurePairHistoryExists(number) {
+  if (!pairHistoryByMember[number]) pairHistoryByMember[number] = {};
+}
+
+function ensureOpponentHistoryExists(number) {
+  if (!opponentHistoryByMember[number]) opponentHistoryByMember[number] = {};
+}
+
+function getPairCount(firstNumber, secondNumber) {
+  return pairCounts[getPairKey(firstNumber, secondNumber)] || 0;
+}
+
+function recordPairUsage(firstNumber, secondNumber) {
+  const pairKey = getPairKey(firstNumber, secondNumber);
+  pairCounts[pairKey] = (pairCounts[pairKey] || 0) + 1;
+
+  ensurePairHistoryExists(firstNumber);
+  ensurePairHistoryExists(secondNumber);
+  pairHistoryByMember[firstNumber][secondNumber] = (pairHistoryByMember[firstNumber][secondNumber] || 0) + 1;
+  pairHistoryByMember[secondNumber][firstNumber] = (pairHistoryByMember[secondNumber][firstNumber] || 0) + 1;
+}
+
+function getOpponentKey(teamA, teamB) {
+  const sortedTeams = [teamA, teamB].map((pair) => getPairKey(pair[0], pair[1])).sort((left, right) => {
+    const [firstLeft, secondLeft] = left.split("-").map(Number);
+    const [firstRight, secondRight] = right.split("-").map(Number);
+    if (firstLeft !== firstRight) return firstLeft - firstRight;
+    return secondLeft - secondRight;
+  });
+  return `${sortedTeams[0]}__${sortedTeams[1]}`;
+}
+
+function recordOpponentUsage(teamA, teamB) {
+  const opponentKey = getOpponentKey(teamA, teamB);
+  opponentCounts[opponentKey] = (opponentCounts[opponentKey] || 0) + 1;
+
+  teamA.forEach((member) => {
+    ensureOpponentHistoryExists(member);
+    teamB.forEach((opponent) => {
+      opponentHistoryByMember[member][opponent] = (opponentHistoryByMember[member][opponent] || 0) + 1;
+    });
+  });
+
+  teamB.forEach((member) => {
+    ensureOpponentHistoryExists(member);
+    teamA.forEach((opponent) => {
+      opponentHistoryByMember[member][opponent] = (opponentHistoryByMember[member][opponent] || 0) + 1;
+    });
+  });
 }
 
 // 休憩者を選ぶ関数です。
@@ -386,44 +727,107 @@ function getPairKey(firstNumber, secondNumber) {
 }
 
 // 有効なプレイヤーの中からペアを作成します。
-// 前回のペアと同じ組み合わせはなるべく避けるようにします。
-function buildPairings(activeNumbers, bannedPairKeys) {
+// 未ペアを優先しつつ、候補が少ないメンバーを先に救うように組み合わせます。
+function buildPairings(activeNumbers) {
   const remainingNumbers = [...activeNumbers]; // 未処理のプレイヤー番号リスト（選ぶたびに減る）
-  const pairings = []; // 生成されたペアの配列
+  const memo = new Map();
 
-  while (remainingNumbers.length >= 2) {
-    const candidatePairs = []; // 有効なペアの候補リスト（前回のペアを除外）
+  function getMemberPartnerStats(member, remaining) {
+    let bestPairCount = Infinity;
+    let partnerCount = 0;
 
-    //試合に出る人の中から、作れる2人組（ペア）を全部作り、過去に組んだペアは除外する
-    for (let index = 0; index < remainingNumbers.length; index += 1) {
-      for (let nextIndex = index + 1; nextIndex < remainingNumbers.length; nextIndex += 1) {
-        const firstNumber = remainingNumbers[index];
-        const secondNumber = remainingNumbers[nextIndex];
-        const pair = [firstNumber, secondNumber].sort((a, b) => a - b); // ペアをソート
-        const pairKey = getPairKey(firstNumber, secondNumber); // ペアの一意キー（"1-2"形式）
-
-        if (!bannedPairKeys.includes(pairKey)) {
-          candidatePairs.push({ pair, pairKey });
-        }
+    for (const other of remaining) {
+      if (other === member) continue;
+      const currentCount = getPairCount(member, other);
+      if (currentCount < bestPairCount) {
+        bestPairCount = currentCount;
+        partnerCount = 1;
+      } else if (currentCount === bestPairCount) {
+        partnerCount += 1;
       }
     }
 
-    const selectedPair = candidatePairs.length > 0 // 有効な候補があれば候補から選ぶ、なければ先頭から選ぶ
-      ? candidatePairs[Math.floor(Math.random() * candidatePairs.length)]
-      : {
-        pair: [remainingNumbers[0], remainingNumbers[1]].sort((a, b) => a - b),
-        pairKey: getPairKey(remainingNumbers[0], remainingNumbers[1])
-      };
-
-    pairings.push(selectedPair.pair);
-
-    const firstNumber = selectedPair.pair[0]; // 選ばれたペアの1番目
-    const secondNumber = selectedPair.pair[1]; // 選ばれたペアの2番目
-    remainingNumbers.splice(remainingNumbers.indexOf(firstNumber), 1); // 処理済みなのでリストから削除
-    remainingNumbers.splice(remainingNumbers.indexOf(secondNumber), 1);
+    return { bestPairCount, partnerCount };
   }
 
-  return pairings;
+  function pickAnchorMember(remaining) {
+    const stats = remaining.map((member) => {
+      const partnerStats = getMemberPartnerStats(member, remaining);
+      return { member, ...partnerStats };
+    });
+
+    const smallestPartnerCount = Math.min(...stats.map((item) => item.partnerCount));
+    const constrainedMembers = stats.filter((item) => item.partnerCount === smallestPartnerCount);
+    const smallestBestPairCount = Math.min(...constrainedMembers.map((item) => item.bestPairCount));
+    const bestCandidates = constrainedMembers.filter((item) => item.bestPairCount === smallestBestPairCount);
+    return bestCandidates[Math.floor(Math.random() * bestCandidates.length)];
+  }
+
+  function isBetterScore(candidateScore, currentBestScore) {
+    if (!currentBestScore) return true;
+    if (candidateScore.zeroPairs !== currentBestScore.zeroPairs) {
+      return candidateScore.zeroPairs > currentBestScore.zeroPairs;
+    }
+    if (candidateScore.totalPairCount !== currentBestScore.totalPairCount) {
+      return candidateScore.totalPairCount < currentBestScore.totalPairCount;
+    }
+    if (candidateScore.rarityPenalty !== currentBestScore.rarityPenalty) {
+      return candidateScore.rarityPenalty < currentBestScore.rarityPenalty;
+    }
+    return false;
+  }
+
+  function areSameScore(scoreA, scoreB) {
+    return scoreA.zeroPairs === scoreB.zeroPairs
+      && scoreA.totalPairCount === scoreB.totalPairCount
+      && scoreA.rarityPenalty === scoreB.rarityPenalty;
+  }
+
+  function solve(remaining) {
+    if (remaining.length < 2) {
+      return { pairings: [], score: { zeroPairs: 0, totalPairCount: 0, rarityPenalty: 0 } };
+    }
+
+    const memoKey = remaining.join(",");
+    if (memo.has(memoKey)) {
+      return memo.get(memoKey);
+    }
+
+    const anchorStats = pickAnchorMember(remaining);
+    const anchorMember = anchorStats.member;
+    const partnerCandidates = remaining.filter((member) => member !== anchorMember);
+    let bestSolution = null;
+
+    for (const partnerMember of partnerCandidates) {
+      const nextRemaining = remaining.filter((member) => member !== anchorMember && member !== partnerMember);
+      const subSolution = solve(nextRemaining);
+      const currentPairCount = getPairCount(anchorMember, partnerMember);
+      const partnerStats = getMemberPartnerStats(partnerMember, remaining);
+      const candidateScore = {
+        zeroPairs: subSolution.score.zeroPairs + (currentPairCount === 0 ? 1 : 0),
+        totalPairCount: subSolution.score.totalPairCount + currentPairCount,
+        rarityPenalty: subSolution.score.rarityPenalty + anchorStats.partnerCount + partnerStats.partnerCount
+      };
+      const candidateSolution = {
+        pairings: [[anchorMember, partnerMember].sort((a, b) => a - b), ...subSolution.pairings],
+        score: candidateScore
+      };
+
+      if (!bestSolution || isBetterScore(candidateSolution.score, bestSolution.score)) {
+        bestSolution = candidateSolution;
+        continue;
+      }
+
+      if (bestSolution && areSameScore(candidateSolution.score, bestSolution.score) && Math.random() < 0.5) {
+        bestSolution = candidateSolution;
+      }
+    }
+
+    memo.set(memoKey, bestSolution);
+    return bestSolution;
+  }
+
+  return solve(remainingNumbers).pairings;
 }
 
 // 試合を作成するメインの関数です。
@@ -436,7 +840,7 @@ function createMatches(courtCount) {
   const restNumbers = chooseRestNumbersFromActive(restCount);
 
   const playingNumbers = activeNumbers.filter((n) => !restNumbers.includes(n));
-  const pairs = buildPairings(playingNumbers, previousPairKeys);
+  const pairs = buildPairings(playingNumbers);
 
   const matches = []; // 作成される試合情報の配列
   for (let index = 0; index < possibleMatchCount; index += 1) {
@@ -453,6 +857,18 @@ function createMatches(courtCount) {
     }
   }
 
+  pairs.forEach((pair) => {
+    if (pair && pair.length === 2) {
+      recordPairUsage(pair[0], pair[1]);
+    }
+  });
+
+  matches.forEach((match) => {
+    if (match.teamA && match.teamB) {
+      recordOpponentUsage(match.teamA, match.teamB);
+    }
+  });
+
   // 休憩した人の回数を記録に反映します。
   restNumbers.forEach((number) => {
     ensureRestCountExists(number);
@@ -461,9 +877,6 @@ function createMatches(courtCount) {
 
   // 直近試合の休憩者番号として保持（将来の表示連携用）
   lastRestNumbers = [...restNumbers];
-
-  // 次回の組み合わせで同じペアが出ないように、今回のペアを保存します。
-  previousPairKeys = pairs.map((pair) => getPairKey(pair[0], pair[1]));
 
   return { matches, restNumbers };
 }
@@ -513,6 +926,395 @@ function renderRestTable() {
   statsRestTable.appendChild(restTable);
 }
 
+function getTrackedMemberNumbers() {
+  const maxNumberToShow = Math.max(nextNumber - 1, activeNumbers.length);
+  return Array.from({ length: maxNumberToShow }, (_, index) => index + 1);
+}
+
+function compareMemberPairEntries(left, right) {
+  if (right.count !== left.count) return right.count - left.count;
+  return left.number - right.number;
+}
+
+function compareMemberOpponentEntries(left, right) {
+  if (right.count !== left.count) return right.count - left.count;
+  return left.number - right.number;
+}
+
+function buildMemberPairDetail(memberNumber, memberNumbers) {
+  const detail = document.createElement('div');
+  detail.className = 'stats-member-detail';
+
+  const title = document.createElement('p');
+  title.className = 'stats-member-detail-title';
+  title.textContent = `${memberNumber}番のペア相手`;
+  detail.appendChild(title);
+
+  const partnerEntries = memberNumbers
+    .filter((number) => number !== memberNumber)
+    .map((number) => ({
+      number,
+      count: pairHistoryByMember[memberNumber]?.[number] || 0
+    }))
+    .filter((entry) => entry.count > 0)
+    .sort(compareMemberPairEntries);
+
+  if (partnerEntries.length === 0) {
+    const empty = document.createElement('p');
+    empty.className = 'stats-member-detail-empty';
+    empty.textContent = 'まだこのメンバーのペア履歴はありません。';
+    detail.appendChild(empty);
+    return detail;
+  }
+
+  const tableWrap = document.createElement('div');
+  tableWrap.className = 'stats-member-detail-table';
+
+  const table = document.createElement('table');
+  table.className = 'rest-table';
+
+  const headerRow = document.createElement('tr');
+  const headerPartner = document.createElement('th');
+  headerPartner.textContent = '相手';
+  const headerCount = document.createElement('th');
+  headerCount.textContent = '回数';
+  headerRow.appendChild(headerPartner);
+  headerRow.appendChild(headerCount);
+  table.appendChild(headerRow);
+
+  partnerEntries.forEach((entry) => {
+    const row = document.createElement('tr');
+    const partnerCell = document.createElement('td');
+    partnerCell.textContent = `${entry.number}番`;
+    const countCell = document.createElement('td');
+    countCell.textContent = `${entry.count}回`;
+    row.appendChild(partnerCell);
+    row.appendChild(countCell);
+    table.appendChild(row);
+  });
+
+  tableWrap.appendChild(table);
+  detail.appendChild(tableWrap);
+  return detail;
+}
+
+function renderMemberPairStats() {
+  if (!statsMemberSelect || !statsMemberDetail) return;
+
+  const memberNumbers = getTrackedMemberNumbers();
+  statsMemberSelect.innerHTML = '';
+  statsMemberDetail.innerHTML = '';
+
+  if (memberNumbers.length === 0) {
+    const empty = document.createElement('p');
+    empty.className = 'stats-member-detail-empty';
+    empty.textContent = 'まだメンバー履歴はありません。';
+    statsMemberDetail.appendChild(empty);
+    selectedMemberNumber = null;
+    return;
+  }
+
+  if (!selectedMemberNumber || !memberNumbers.includes(selectedMemberNumber)) {
+    selectedMemberNumber = memberNumbers[0];
+  }
+
+  memberNumbers.forEach((memberNumber) => {
+    const option = document.createElement('option');
+    option.value = String(memberNumber);
+    option.textContent = retiredSet.has(memberNumber) ? `${memberNumber}番（途中退場）` : `${memberNumber}番`;
+    if (memberNumber === selectedMemberNumber) {
+      option.selected = true;
+    }
+    statsMemberSelect.appendChild(option);
+  });
+
+  statsMemberSelect.value = String(selectedMemberNumber);
+  if (!statsMemberSelect.dataset.bound) {
+    statsMemberSelect.addEventListener('change', () => {
+      selectedMemberNumber = Number(statsMemberSelect.value);
+      renderMemberPairStats();
+    });
+    statsMemberSelect.dataset.bound = 'true';
+  }
+
+  statsMemberDetail.appendChild(buildMemberPairDetail(selectedMemberNumber, memberNumbers));
+}
+
+function buildMemberOpponentDetail(memberNumber, memberNumbers) {
+  const detail = document.createElement('div');
+  detail.className = 'stats-member-detail';
+
+  const title = document.createElement('p');
+  title.className = 'stats-member-detail-title';
+  title.textContent = `${memberNumber}番の対戦相手`;
+  detail.appendChild(title);
+
+  const opponentEntries = memberNumbers
+    .filter((number) => number !== memberNumber)
+    .map((number) => ({
+      number,
+      count: opponentHistoryByMember[memberNumber]?.[number] || 0
+    }))
+    .filter((entry) => entry.count > 0)
+    .sort(compareMemberOpponentEntries);
+
+  if (opponentEntries.length === 0) {
+    const empty = document.createElement('p');
+    empty.className = 'stats-member-detail-empty';
+    empty.textContent = 'まだこのメンバーの対戦履歴はありません。';
+    detail.appendChild(empty);
+    return detail;
+  }
+
+  const tableWrap = document.createElement('div');
+  tableWrap.className = 'stats-member-detail-table';
+
+  const table = document.createElement('table');
+  table.className = 'rest-table';
+
+  const headerRow = document.createElement('tr');
+  const headerOpponent = document.createElement('th');
+  headerOpponent.textContent = '相手';
+  const headerCount = document.createElement('th');
+  headerCount.textContent = '回数';
+  headerRow.appendChild(headerOpponent);
+  headerRow.appendChild(headerCount);
+  table.appendChild(headerRow);
+
+  opponentEntries.forEach((entry) => {
+    const row = document.createElement('tr');
+    const opponentCell = document.createElement('td');
+    opponentCell.textContent = `${entry.number}番`;
+    const countCell = document.createElement('td');
+    countCell.textContent = `${entry.count}回`;
+    row.appendChild(opponentCell);
+    row.appendChild(countCell);
+    table.appendChild(row);
+  });
+
+  tableWrap.appendChild(table);
+  detail.appendChild(tableWrap);
+  return detail;
+}
+
+function renderOpponentStats() {
+  if (!statsOpponentSelect || !statsOpponentDetail) return;
+
+  const memberNumbers = getTrackedMemberNumbers();
+  statsOpponentSelect.innerHTML = '';
+  statsOpponentDetail.innerHTML = '';
+
+  if (memberNumbers.length === 0) {
+    const empty = document.createElement('p');
+    empty.className = 'stats-member-detail-empty';
+    empty.textContent = 'まだメンバー履歴はありません。';
+    statsOpponentDetail.appendChild(empty);
+    selectedOpponentMemberNumber = null;
+    return;
+  }
+
+  if (!selectedOpponentMemberNumber || !memberNumbers.includes(selectedOpponentMemberNumber)) {
+    selectedOpponentMemberNumber = memberNumbers[0];
+  }
+
+  memberNumbers.forEach((memberNumber) => {
+    const option = document.createElement('option');
+    option.value = String(memberNumber);
+    option.textContent = retiredSet.has(memberNumber) ? `${memberNumber}番（途中退場）` : `${memberNumber}番`;
+    if (memberNumber === selectedOpponentMemberNumber) {
+      option.selected = true;
+    }
+    statsOpponentSelect.appendChild(option);
+  });
+
+  statsOpponentSelect.value = String(selectedOpponentMemberNumber);
+  if (!statsOpponentSelect.dataset.bound) {
+    statsOpponentSelect.addEventListener('change', () => {
+      selectedOpponentMemberNumber = Number(statsOpponentSelect.value);
+      renderOpponentStats();
+    });
+    statsOpponentSelect.dataset.bound = 'true';
+  }
+
+  statsOpponentDetail.appendChild(buildMemberOpponentDetail(selectedOpponentMemberNumber, memberNumbers));
+}
+
+function getScoredCourts() {
+  normalizeHistoryCourtScores();
+  const scoredCourts = [];
+
+  historyEntries.forEach((entry) => {
+    if (entry.type !== "match" || !entry.courts) return;
+    entry.courts.forEach((court) => {
+      if (court.hasScoreInput !== true) {
+        return;
+      }
+      scoredCourts.push({
+        round: entry.round,
+        courtIndex: court.label,
+        teamA: [...(court.teamA || [])],
+        teamB: [...(court.teamB || [])],
+        scoreA: court.scoreA,
+        scoreB: court.scoreB
+      });
+    });
+  });
+
+  return scoredCourts;
+}
+
+function buildRankingTable(headers, rows) {
+  const table = document.createElement("table");
+  table.className = "rest-table";
+
+  const headerRow = document.createElement("tr");
+  headers.forEach((headerText) => {
+    const header = document.createElement("th");
+    header.textContent = headerText;
+    headerRow.appendChild(header);
+  });
+  table.appendChild(headerRow);
+
+  if (rows.length === 0) {
+    const emptyRow = document.createElement("tr");
+    const emptyCell = document.createElement("td");
+    emptyCell.colSpan = headers.length;
+    emptyCell.textContent = "まだ点数が入力されていません。";
+    emptyRow.appendChild(emptyCell);
+    table.appendChild(emptyRow);
+    return table;
+  }
+
+  rows.forEach((rowValues) => {
+    const row = document.createElement("tr");
+    rowValues.forEach((value) => {
+      const cell = document.createElement("td");
+      cell.textContent = value;
+      row.appendChild(cell);
+    });
+    table.appendChild(row);
+  });
+
+  return table;
+}
+
+function compareRankingEntries(left, right) {
+  if (right.wins !== left.wins) return right.wins - left.wins;
+  if (right.appearances !== left.appearances) return right.appearances - left.appearances;
+  return left.number - right.number;
+}
+
+function comparePairRankingEntries(left, right) {
+  if (right.wins !== left.wins) return right.wins - left.wins;
+  if (right.appearances !== left.appearances) return right.appearances - left.appearances;
+  return comparePairKeys(left.pairKey, right.pairKey);
+}
+
+function comparePairKeys(pairKeyA, pairKeyB) {
+  const [firstA, secondA] = pairKeyA.split("-").map(Number);
+  const [firstB, secondB] = pairKeyB.split("-").map(Number);
+  if (firstA !== firstB) return firstA - firstB;
+  return secondA - secondB;
+}
+
+function getRankingData() {
+  const scoredCourts = getScoredCourts();
+  const individualMap = new Map();
+  const pairMap = new Map();
+
+  const ensureIndividual = (number) => {
+    if (!individualMap.has(number)) {
+      individualMap.set(number, { number, wins: 0, appearances: 0 });
+    }
+    return individualMap.get(number);
+  };
+
+  scoredCourts.forEach((court) => {
+    const teamAIsWinner = court.scoreA > court.scoreB;
+    const teamBIsWinner = court.scoreB > court.scoreA;
+    const teams = [
+      { members: court.teamA, winner: teamAIsWinner },
+      { members: court.teamB, winner: teamBIsWinner }
+    ];
+
+    teams.forEach((team) => {
+      (team.members || []).forEach((member) => {
+        const entry = ensureIndividual(member);
+        entry.appearances += 1;
+        if (team.winner) {
+          entry.wins += 1;
+        }
+      });
+
+      if (team.winner && team.members && team.members.length === 2) {
+        const pairKey = getPairKey(team.members[0], team.members[1]);
+        pairMap.set(pairKey, (pairMap.get(pairKey) || 0) + 1);
+      }
+    });
+  });
+
+  const individualRows = [...individualMap.values()]
+    .sort(compareRankingEntries);
+
+  const pairRows = [...pairMap.entries()]
+    .map(([pairKey, wins]) => ({
+      pairKey,
+      wins,
+      appearances: wins
+    }))
+    .sort(comparePairRankingEntries);
+
+  return { individualRows, pairRows };
+}
+
+function renderRankingStats() {
+  if (!statsRankingArea) return;
+
+  const { individualRows, pairRows } = getRankingData();
+  statsRankingArea.innerHTML = "";
+
+  const individualSection = document.createElement("div");
+  individualSection.className = "ranking-section";
+
+  const individualTitle = document.createElement("p");
+  individualTitle.className = "stats-member-detail-title";
+  individualTitle.textContent = "個人勝利数";
+  individualSection.appendChild(individualTitle);
+
+  const individualRowsData = individualRows.slice(0, 5).map((entry, index) => [
+    `${index + 1}位`,
+    `${entry.number}番`,
+    `${entry.wins}勝`
+  ]);
+  individualSection.appendChild(buildRankingTable(["順位", "メンバー", "勝利数"], individualRowsData));
+
+  const pairSection = document.createElement("div");
+  pairSection.className = "ranking-section";
+
+  const pairTitle = document.createElement("p");
+  pairTitle.className = "stats-member-detail-title";
+  pairTitle.textContent = "ペア勝利数";
+  pairSection.appendChild(pairTitle);
+
+  const pairRowsData = pairRows.slice(0, 5).map((entry, index) => [
+    `${index + 1}位`,
+    entry.pairKey,
+    `${entry.wins}勝`
+  ]);
+  pairSection.appendChild(buildRankingTable(["順位", "ペア", "勝利数"], pairRowsData));
+
+  if (individualRows.length === 0 && pairRows.length === 0) {
+    const empty = document.createElement("p");
+    empty.className = "stats-member-detail-empty";
+    empty.textContent = "まだ点数が入力されていません。";
+    statsRankingArea.appendChild(empty);
+    return;
+  }
+
+  statsRankingArea.appendChild(individualSection);
+  statsRankingArea.appendChild(pairSection);
+}
+
 // 結果表示と状態を初期化します。
 function resetResults() {
   setSetupStateVisibility(true);
@@ -522,7 +1324,6 @@ function resetResults() {
     resultSubSummary.textContent = "参加人数とコート数を設定して「試合開始」を押してください";
   }
   matchListElement.innerHTML = "";
-  previousPairKeys = [];
   modeHint.textContent = "";
   pendingNotices = [];
   renderPendingNotices();
@@ -646,7 +1447,15 @@ function appendMatchHistory(matches, restNumbers) {
     type: "match",
     round: matchRoundCount,
     startedAt: new Date().toISOString(),
-    courts: matches.map((match) => ({ label: match.label, text: match.text })),
+    courts: matches.map((match) => ({
+      label: match.label,
+      text: match.text,
+      teamA: [...(match.teamA || [])],
+      teamB: [...(match.teamB || [])],
+      scoreA: 0,
+      scoreB: 0,
+      hasScoreInput: false
+    })),
     restNumbers: [...restNumbers]
   };
   historyEntries.push(entry);
@@ -689,6 +1498,9 @@ function handleCreateMatches() {
   appendMatchHistory(created.matches, created.restNumbers);
   isLocked = true;
   setControlsLocked(true);
+  renderMemberPairStats();
+  renderOpponentStats();
+  renderRankingStats();
 }
 
 // ペア作成確認モーダルを開きます（モーダル未使用時は即実行）。
@@ -715,12 +1527,21 @@ function handleReset() {
   retiredSet = new Set();
   nextNumber = 1;
   restCounts = [];
+  pairCounts = {};
+  pairHistoryByMember = {};
+  opponentCounts = {};
+  opponentHistoryByMember = {};
+  selectedMemberNumber = null;
+  selectedOpponentMemberNumber = null;
   lastRestNumbers = [];
   matchRoundCount = 0;
   historyEntries = [];
   resetResults();
   renderHistoryList();
   renderRestTable();
+  renderMemberPairStats();
+  renderOpponentStats();
+  renderRankingStats();
 }
 
 // リセット確認モーダルを開きます（モーダル未使用時は即実行）。
@@ -812,6 +1633,8 @@ addParticipantButton.addEventListener("click", () => {
     : 0;
   const assigned = nextNumber;
   ensureRestCountExists(assigned);
+  ensurePairHistoryExists(assigned);
+  ensureOpponentHistoryExists(assigned);
   restCounts[assigned] = currentMaxRest;
   activeNumbers.push(assigned);
   nextNumber += 1;
@@ -822,6 +1645,8 @@ addParticipantButton.addEventListener("click", () => {
   pendingNotices.push({ text: `次から${assigned}番が参加します。`, type: "add" });
   renderPendingNotices();
   appendMemberChangeHistory("add", assigned);
+  renderMemberPairStats();
+  renderOpponentStats();
 });
 
 // メンバー除外: まず選択欄を出し、選択後に除外します
@@ -858,6 +1683,8 @@ removeParticipantButton.addEventListener("click", () => {
   pendingNotices.push({ text: `次から${value}番が除外されます。`, type: "remove" });
   renderPendingNotices();
   appendMemberChangeHistory("remove", value);
+  renderMemberPairStats();
+  renderOpponentStats();
   if (removeParticipantSelect) {
     removeParticipantSelect.style.display = "none";
     removeParticipantSelect.value = "";
@@ -870,4 +1697,7 @@ resetResults();
 setControlsLocked(false);
 renderHistoryList();
 renderRestTable();
+renderMemberPairStats();
+renderOpponentStats();
+renderRankingStats();
 if (tabMatch) activateTab(tabMatch, screenMatch);
