@@ -5,186 +5,213 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>ピックル試合 - ペア作成</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link
+    href="https://fonts.googleapis.com/css2?family=M+PLUS+Rounded+1c:wght@400;500;700;800;900&family=Nunito:wght@700;800;900&display=swap"
+    rel="stylesheet">
   <link rel="stylesheet" href="styles.css">
 </head>
 
 <body>
   <main class="page-shell">
-    <section class="hero-panel">
-      <span class="eyebrow">Pickleball Match Maker</span>
-      <h1>スマホでも使いやすい、2vs2ペア作成</h1>
-      <p class="hero-copy">人数とコート数を選ぶだけで、次の試合をすばやく決定。休憩者も含めた運営管理がスマホで完結します。</p>
-    </section>
-
-    <div class="app-screen">
-      <section id="screen-match" class="screen active">
-        <section class="panel panel-summary">
-          <div class="summary-top">
-            <div>
-              <p class="summary-label">参加人数</p>
-              <strong id="summaryParticipants" class="summary-value">4人</strong>
-            </div>
-            <div>
-              <p class="summary-label">コート数</p>
-              <strong id="summaryCourts" class="summary-value">1コート</strong>
-            </div>
-          </div>
-          <div class="summary-bottom">
-          </div>
-          <div class="next-match-zone">
-            <div class="panel-heading panel-heading-tight">
-              <p class="panel-label">MATCHBOARD</p>
-            </div>
-            <p id="resultSummary" class="result-summary empty-state">まだ次の試合はありません。人数を選んで「ペア作成」を押してください。</p>
-            <div id="matchList" class="match-list"></div>
-            <div class="badge-card badge-secondary">
-              <span class="badge-title">休憩中</span>
-              <p id="summaryRestMembers" class="summary-rest-members"></p>
-            </div>
-          </div>
-          <div id="liveControlsZone" class="live-controls-zone"></div>
-        </section>
-
-        <section class="panel panel-controls">
-          <div class="panel-heading">
-            <p class="panel-label">Match Setup</p>
-          </div>
-
-          <div class="field-grid">
-            <div class="field-group">
-              <label for="participantCount">参加人数</label>
-              <select id="participantCount">
-                <option value="3">3人</option>
-                <option value="4" selected>4人</option>
-                <option value="5">5人</option>
-                <option value="6">6人</option>
-                <option value="7">7人</option>
-                <option value="8">8人</option>
-                <option value="9">9人</option>
-                <option value="10">10人</option>
-                <option value="11">11人</option>
-                <option value="12">12人</option>
-                <option value="13">13人</option>
-                <option value="14">14人</option>
-                <option value="15">15人</option>
-                <option value="16">16人</option>
-                <option value="17">17人</option>
-                <option value="18">18人</option>
-                <option value="19">19人</option>
-                <option value="20">20人</option>
-              </select>
-            </div>
-
-            <div class="field-group">
-              <label for="courtCount">コート数</label>
-              <select id="courtCount">
-                <option value="1" selected>1コート</option>
-                <option value="2">2コート</option>
-                <option value="3">3コート</option>
-                <option value="4">4コート</option>
-              </select>
-            </div>
-          </div>
-
-          <div class="action-group">
-            <div class="primary-action-stack">
-              <button id="createMatchesButton" class="primary-button">ペア作成</button>
-              <p id="pendingNotice" class="pending-notice"></p>
-            </div>
-            <button id="resetButton" class="secondary-button" type="button">リセット</button>
-          </div>
-
-          <div class="mid-controls">
-            <div class="field-group inline-group">
-              <button id="addParticipantButton" type="button">メンバー追加</button>
-            </div>
-            <div class="field-group inline-group">
-              <button id="removeParticipantButton" type="button">メンバー除外</button>
-              <select id="removeParticipantSelect" style="display:none"></select>
-            </div>
-          </div>
-
-          <div class="meta-info">
-            <p class="hint">人数とコート数に合わせて、2vs2の試合を組み合わせます。</p>
-            <p id="modeHint" class="hint">初回のペア作成前に人数とコート数を変更できます。変更する場合は「リセット」を押してください。</p>
-          </div>
-        </section>
-      </section>
-
-      <section id="screen-history" class="screen">
-        <section class="panel panel-history">
-          <div class="panel-heading">
-            <p class="panel-label">History (仮)</p>
-            <h2>試合履歴</h2>
-          </div>
-          <div class="history-list">
-            <article class="history-card">
-              <div class="history-top">
-                <span>第1試合</span>
-                <span class="history-label">コート1</span>
+    <div class="phone-frame">
+      <div class="app-screen">
+        <section id="screen-match" class="screen active">
+          <section class="panel panel-summary">
+            <div class="brand-row">
+              <div class="brand-left">
+                <span class="brand-mark" aria-hidden="true">
+                  <svg viewBox="0 0 64 64" focusable="false">
+                    <ellipse cx="30" cy="22" rx="17" ry="14"></ellipse>
+                    <rect x="27" y="35" width="6" height="18" rx="3"></rect>
+                    <circle cx="42" cy="44" r="6"></circle>
+                  </svg>
+                </span>
+                <div>
+                  <p class="brand-title">PICKLEBALL</p>
+                  <p class="brand-subtitle">MATCH MAKER</p>
+                </div>
               </div>
-              <p class="history-score"><span class="team-blue">3</span> <span class="team-blue">4</span> VS <span
-                  class="team-red">1</span> <span class="team-red">2</span></p>
-              <p class="history-rest">休憩: 5</p>
-            </article>
-            <article class="history-card">
-              <div class="history-top">
-                <span>第2試合</span>
-                <span class="history-label">コート1</span>
-              </div>
-              <p class="history-score"><span class="team-blue">2</span> <span class="team-blue">5</span> VS <span
-                  class="team-red">1</span> <span class="team-red">3</span></p>
-              <p class="history-rest">休憩: 4</p>
-            </article>
-            <article class="history-card">
-              <div class="history-top">
-                <span>第3試合</span>
-                <span class="history-label">コート1</span>
-              </div>
-              <p class="history-score"><span class="team-blue">1</span> <span class="team-blue">4</span> VS <span
-                  class="team-red">2</span> <span class="team-red">3</span></p>
-              <p class="history-rest">休憩: 5</p>
-            </article>
-          </div>
-        </section>
-      </section>
+            </div>
 
-      <section id="screen-stats" class="screen">
-        <section class="panel panel-stats">
-          <div class="panel-heading">
-            <p class="panel-label">Statistics (仮)</p>
-            <h2>統計</h2>
-          </div>
-          <div class="stats-grid">
-            <article class="stat-card">
-              <h3>休憩回数</h3>
-              <div id="statsRestTable" class="stats-rest-table"></div>
-            </article>
-            <article class="stat-card">
-              <h3>ペア回数</h3>
-              <ul>
-                <li>1-2: 1回</li>
-                <li>3-4: 1回</li>
-                <li>2-5: 1回</li>
-                <li>1-3: 1回</li>
-              </ul>
-            </article>
-          </div>
-          <p class="hint">ここでは仮の統計データを表示しています。今後、実際の組み合わせデータと連動させます。</p>
+            <div class="round-banner">
+              <div class="setup-hero-copy">
+                <p class="round-title" id="setupTitleLabel"><span>PADDLE</span><span>FLOW</span></p>
+                <p class="setup-hero-subtitle">公平なペアで、最高の試合を。</p>
+                <span class="setup-hero-accent" aria-hidden="true"></span>
+              </div>
+              <p class="round-title hidden-panel" id="currentRoundLabel">ROUND 1</p>
+              <span class="hidden-panel" id="roundStatusBadge">進行中</span>
+              <div class="session-visual" aria-hidden="true">
+                <div class="session-orb session-orb-lg"></div>
+                <div class="session-orb session-orb-sm"></div>
+                <svg class="session-paddle" viewBox="0 0 64 64" focusable="false">
+                  <ellipse cx="30" cy="22" rx="17" ry="14"></ellipse>
+                  <rect x="27" y="35" width="6" height="18" rx="3"></rect>
+                </svg>
+                <span class="session-ball"></span>
+              </div>
+            </div>
+
+            <div class="summary-top">
+              <div>
+                <p class="summary-label"><i data-lucide="users"></i><span>参加人数</span></p>
+                <div class="summary-value-row">
+                  <strong id="summaryParticipants" class="summary-value"><span class="summary-number">4</span><span
+                      class="summary-unit">人</span></strong>
+                  <div id="summaryParticipantDelta" class="summary-participant-delta"></div>
+                </div>
+              </div>
+              <div>
+                <p class="summary-label"><i data-lucide="layout-grid"></i><span>コート数</span></p>
+                <div class="summary-value-row">
+                  <strong id="summaryCourts" class="summary-value"><span class="summary-number">1</span><span
+                      class="summary-unit">面</span></strong>
+                </div>
+              </div>
+            </div>
+
+            <div class="next-match-zone">
+              <div id="emptyStateVisual" class="empty-state-visual" aria-hidden="true">
+                <span class="empty-state-visual-ring"></span>
+                <i data-lucide="clipboard"></i>
+              </div>
+              <p id="resultSummary" class="result-summary empty-state">まだ試合はありません</p>
+              <p id="resultSubSummary" class="result-sub-summary">参加人数とコート数を設定して「試合開始」を押してください</p>
+              <div id="matchList" class="match-list"></div>
+              <div class="rest-strip">
+                <span class="rest-strip-title">休憩中</span>
+                <p id="summaryRestMembers" class="summary-rest-members"></p>
+              </div>
+            </div>
+
+            <div id="liveControlsZone" class="live-controls-zone"></div>
+          </section>
+
+          <section class="panel panel-controls">
+            <div class="panel-heading">
+              <p class="panel-label">Match Setup</p>
+            </div>
+
+            <div class="field-grid">
+              <div class="field-group">
+                <label for="participantCount">参加人数</label>
+                <select id="participantCount">
+                  <option value="3">3人</option>
+                  <option value="4" selected>4人</option>
+                  <option value="5">5人</option>
+                  <option value="6">6人</option>
+                  <option value="7">7人</option>
+                  <option value="8">8人</option>
+                  <option value="9">9人</option>
+                  <option value="10">10人</option>
+                  <option value="11">11人</option>
+                  <option value="12">12人</option>
+                  <option value="13">13人</option>
+                  <option value="14">14人</option>
+                  <option value="15">15人</option>
+                  <option value="16">16人</option>
+                  <option value="17">17人</option>
+                  <option value="18">18人</option>
+                  <option value="19">19人</option>
+                  <option value="20">20人</option>
+                </select>
+              </div>
+
+              <div class="field-group">
+                <label for="courtCount">コート数</label>
+                <select id="courtCount">
+                  <option value="1" selected>1コート</option>
+                  <option value="2">2コート</option>
+                  <option value="3">3コート</option>
+                  <option value="4">4コート</option>
+                </select>
+              </div>
+            </div>
+
+            <div class="action-group">
+              <div class="primary-action-stack">
+                <button id="createMatchesButton" class="primary-button">試合開始</button>
+                <p id="pendingNotice" class="pending-notice"></p>
+              </div>
+              <button id="resetButton" class="secondary-button" type="button">リセット</button>
+            </div>
+
+            <div class="mid-controls">
+              <div class="field-group inline-group">
+                <button id="addParticipantButton" type="button">メンバー追加</button>
+              </div>
+              <div class="field-group inline-group">
+                <button id="removeParticipantButton" type="button">メンバー除外</button>
+                <select id="removeParticipantSelect" style="display:none"></select>
+              </div>
+            </div>
+
+            <div class="meta-info">
+              <p id="modeHint" class="hint"></p>
+            </div>
+          </section>
         </section>
-      </section>
+
+        <section id="screen-history" class="screen">
+          <section class="panel panel-history">
+            <div class="panel-heading">
+              <p class="panel-label">History</p>
+              <h2>試合履歴</h2>
+            </div>
+            <div id="historyList" class="history-list history-timeline"></div>
+          </section>
+        </section>
+
+        <section id="screen-stats" class="screen">
+          <section class="panel panel-stats">
+            <div class="panel-heading">
+              <p class="panel-label">Statistics</p>
+              <h2>統計</h2>
+            </div>
+            <div class="stats-grid">
+              <article class="stat-card">
+                <h3>休憩回数</h3>
+                <div id="statsRestTable" class="stats-rest-table"></div>
+              </article>
+              <article class="stat-card">
+                <h3>ペア回数（仮）</h3>
+                <ul>
+                  <li>1-2: 1回</li>
+                  <li>3-4: 1回</li>
+                  <li>2-5: 1回</li>
+                  <li>1-3: 1回</li>
+                </ul>
+              </article>
+              <article class="stat-card">
+                <h3>勝利数ランキング（仮）</h3>
+                <ul>
+                  <li>1位: 3番 (7勝)</li>
+                  <li>2位: 1番 (6勝)</li>
+                  <li>3位: 5番 (5勝)</li>
+                  <li>4位: 2番 (4勝)</li>
+                </ul>
+              </article>
+            </div>
+          </section>
+        </section>
+      </div>
+
+      <nav class="tab-bar">
+        <button id="tabMatch" class="tab active"><span class="tab-icon"><i
+              data-lucide="house"></i></span><span>試合</span></button>
+        <button id="tabHistory" class="tab"><span class="tab-icon"><i
+              data-lucide="history"></i></span><span>履歴</span></button>
+        <button id="tabStats" class="tab"><span class="tab-icon"><i
+              data-lucide="bar-chart-3"></i></span><span>統計</span></button>
+      </nav>
     </div>
-
-    <nav class="tab-bar">
-      <button id="tabMatch" class="tab active"><span class="tab-icon">🔀</span><span>試合</span></button>
-      <button id="tabHistory" class="tab"><span class="tab-icon">🕒</span><span>履歴 (仮)</span></button>
-      <button id="tabStats" class="tab"><span class="tab-icon">📊</span><span>統計 (仮)</span></button>
-    </nav>
   </main>
 
   <div id="confirmModal" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="confirmModalTitle">
     <div class="modal-content">
-      <p id="confirmModalTitle" class="modal-message">ペア作成しますか？</p>
+      <p id="confirmModalTitle" class="modal-message">次の試合を生成しますか？</p>
       <div class="modal-actions">
         <button id="confirmCreateButton" type="button">作成</button>
         <button id="cancelCreateButton" type="button" class="secondary-button">キャンセル</button>
@@ -203,7 +230,13 @@
     </div>
   </div>
 
+  <script src="https://unpkg.com/lucide@latest"></script>
   <script src="script.js"></script>
+  <script>
+    if (window.lucide) {
+      window.lucide.createIcons();
+    }
+  </script>
 </body>
 
 </html>
