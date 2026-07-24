@@ -40,6 +40,8 @@ const metaInfo = document.querySelector(".meta-info");
 const liveControlsZone = document.getElementById("liveControlsZone");
 const tabBar = document.querySelector(".tab-bar");
 const historyMemberSelect = document.getElementById("historyMemberSelect");
+const sessionArchivePanel = document.getElementById("sessionArchivePanel");
+const sessionArchiveList = document.getElementById("sessionArchiveList");
 const statsRestTable = document.getElementById("statsRestTable");
 const statsMemberSelect = document.getElementById("statsMemberSelect");
 const statsMemberDetail = document.getElementById("statsMemberDetail");
@@ -47,6 +49,12 @@ const statsOpponentSelect = document.getElementById("statsOpponentSelect");
 const statsOpponentDetail = document.getElementById("statsOpponentDetail");
 const statsRankingArea = document.getElementById("statsRankingArea");
 const nextMatchZone = document.querySelector(".next-match-zone");
+const tabMatchLabel = tabMatch ? tabMatch.querySelector("span:last-child") : null;
+const tabMatchIcon = tabMatch ? tabMatch.querySelector("i") : null;
+
+const RESET_ARCHIVE_STORAGE_KEY = "pickle-match-reset-archives";
+const MAX_RESET_ARCHIVES = 5;
+const RESET_ARCHIVE_RETENTION_DAYS = 3;
 
 // === ゲーム状態管理用変数 ===
 let restCounts = []; // 各プレイヤーの休憩回数を記録する配列（インデックス = プレイヤー番号）
@@ -67,6 +75,9 @@ let lastRestNumbers = []; // 直近で作成された休憩者リスト（表示
 let pendingNotices = []; // 次回反映される追加/除外メッセージの配列
 let matchRoundCount = 0; // 何試合目まで作成済みかを管理
 let historyEntries = []; // 試合とメンバー変更を含む履歴エントリ
+let resetArchives = [];
+let isArchiveViewMode = false;
+let runtimeStateBeforeArchiveView = null;
 
 function updateCurrentRoundLabel() {
   if (!currentRoundLabel) return;
@@ -138,6 +149,282 @@ function formatMatchStartTime(timestamp) {
   return `${hh}:${mi}`;
 }
 
+function safeClone(value) {
+  return JSON.parse(JSON.stringify(value));
+}
+
+function formatDateYmd(timestamp) {
+  const parsed = new Date(timestamp);
+  if (Number.isNaN(parsed.getTime())) return "----/--/--";
+  const yyyy = String(parsed.getFullYear());
+  const mm = String(parsed.getMonth() + 1).padStart(2, "0");
+  const dd = String(parsed.getDate()).padStart(2, "0");
+  return `${yyyy}/${mm}/${dd}`;
+}
+
+function sortResetArchivesByEndedAtDesc(archives) {
+  return [...archives].sort((left, right) => {
+    const leftTime = new Date(left.endedAt).getTime();
+    const rightTime = new Date(right.endedAt).getTime();
+    return rightTime - leftTime;
+  });
+}
+
+function sanitizeResetArchiveItem(item) {
+  if (!item || typeof item !== "object") return null;
+  if (!item.id || !item.startedAt || !item.endedAt) return null;
+  if (!Array.isArray(item.historyEntries)) return null;
+
+  return {
+    id: String(item.id),
+    startedAt: item.startedAt,
+    endedAt: item.endedAt,
+    matchRoundCount: Number(item.matchRoundCount) || 0,
+    nextNumber: Number(item.nextNumber) || 1,
+    activeNumbers: Array.isArray(item.activeNumbers) ? item.activeNumbers : [],
+    retiredNumbers: Array.isArray(item.retiredNumbers) ? item.retiredNumbers : [],
+    restCounts: item.restCounts || [],
+    pairCounts: item.pairCounts || {},
+    pairHistoryByMember: item.pairHistoryByMember || {},
+    opponentCounts: item.opponentCounts || {},
+    opponentHistoryByMember: item.opponentHistoryByMember || {},
+    historyEntries: item.historyEntries
+  };
+}
+
+function normalizeResetArchives(archives) {
+  const now = Date.now();
+  const retentionMs = RESET_ARCHIVE_RETENTION_DAYS * 24 * 60 * 60 * 1000;
+  const sanitized = archives
+    .map(sanitizeResetArchiveItem)
+    .filter((item) => item !== null)
+    .filter((item) => {
+      const endedAtMs = new Date(item.endedAt).getTime();
+      if (Number.isNaN(endedAtMs)) return false;
+      return now - endedAtMs <= retentionMs;
+    });
+
+  return sortResetArchivesByEndedAtDesc(sanitized).slice(0, MAX_RESET_ARCHIVES);
+}
+
+function loadResetArchives() {
+  try {
+    const raw = window.localStorage.getItem(RESET_ARCHIVE_STORAGE_KEY);
+    if (!raw) return [];
+    const parsed = JSON.parse(raw);
+    if (!Array.isArray(parsed)) return [];
+    return normalizeResetArchives(parsed);
+  } catch (_error) {
+    return [];
+  }
+}
+
+function saveResetArchives() {
+  try {
+    window.localStorage.setItem(RESET_ARCHIVE_STORAGE_KEY, JSON.stringify(resetArchives));
+  } catch (_error) {
+    // localStorage が使えない環境では保存をスキップします。
+  }
+}
+
+function getCurrentSessionStartTime() {
+  const matchStarts = historyEntries
+    .filter((entry) => entry.type === "match" && entry.startedAt)
+    .map((entry) => entry.startedAt)
+    .filter((timestamp) => !Number.isNaN(new Date(timestamp).getTime()))
+    .sort();
+
+  if (matchStarts.length > 0) {
+    return matchStarts[0];
+  }
+  return new Date().toISOString();
+}
+
+function hasArchiveTargetData() {
+  return historyEntries.length > 0
+    || Object.keys(pairCounts).length > 0
+    || Object.keys(opponentCounts).length > 0
+    || restCounts.some((value) => Number(value) > 0);
+}
+
+function archiveCurrentSessionBeforeReset() {
+  if (!hasArchiveTargetData()) return;
+
+  const endedAt = new Date().toISOString();
+  const snapshot = {
+    id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+    startedAt: getCurrentSessionStartTime(),
+    endedAt,
+    matchRoundCount,
+    nextNumber,
+    activeNumbers: [...activeNumbers],
+    retiredNumbers: [...retiredSet],
+    restCounts: safeClone(restCounts),
+    pairCounts: safeClone(pairCounts),
+    pairHistoryByMember: safeClone(pairHistoryByMember),
+    opponentCounts: safeClone(opponentCounts),
+    opponentHistoryByMember: safeClone(opponentHistoryByMember),
+    historyEntries: safeClone(historyEntries)
+  };
+
+  resetArchives = normalizeResetArchives([snapshot, ...resetArchives]);
+  saveResetArchives();
+}
+
+function formatResetArchiveLabel(archive) {
+  return `${formatDateYmd(archive.startedAt)} ${formatMatchStartTime(archive.startedAt)}-${formatMatchStartTime(archive.endedAt)}`;
+}
+
+function captureRuntimeState() {
+  return {
+    isLocked,
+    activeNumbers: [...activeNumbers],
+    retiredNumbers: [...retiredSet],
+    nextNumber,
+    restCounts: safeClone(restCounts),
+    pairCounts: safeClone(pairCounts),
+    pairHistoryByMember: safeClone(pairHistoryByMember),
+    opponentCounts: safeClone(opponentCounts),
+    opponentHistoryByMember: safeClone(opponentHistoryByMember),
+    selectedMemberNumber,
+    selectedOpponentMemberNumber,
+    selectedHistoryMemberNumber,
+    lastRestNumbers: [...lastRestNumbers],
+    pendingNotices: safeClone(pendingNotices),
+    matchRoundCount,
+    historyEntries: safeClone(historyEntries)
+  };
+}
+
+function applyRuntimeState(state) {
+  if (!state) return;
+  isLocked = state.isLocked;
+  activeNumbers = [...(state.activeNumbers || [])];
+  retiredSet = new Set(state.retiredNumbers || []);
+  nextNumber = state.nextNumber || 1;
+  restCounts = safeClone(state.restCounts || []);
+  pairCounts = safeClone(state.pairCounts || {});
+  pairHistoryByMember = safeClone(state.pairHistoryByMember || {});
+  opponentCounts = safeClone(state.opponentCounts || {});
+  opponentHistoryByMember = safeClone(state.opponentHistoryByMember || {});
+  selectedMemberNumber = state.selectedMemberNumber ?? null;
+  selectedOpponentMemberNumber = state.selectedOpponentMemberNumber ?? null;
+  selectedHistoryMemberNumber = state.selectedHistoryMemberNumber ?? null;
+  lastRestNumbers = [...(state.lastRestNumbers || [])];
+  pendingNotices = safeClone(state.pendingNotices || []);
+  matchRoundCount = state.matchRoundCount || 0;
+  historyEntries = safeClone(state.historyEntries || []);
+}
+
+function applyArchiveToRuntime(archive) {
+  applyRuntimeState({
+    isLocked: false,
+    activeNumbers: archive.activeNumbers,
+    retiredNumbers: archive.retiredNumbers,
+    nextNumber: archive.nextNumber,
+    restCounts: archive.restCounts,
+    pairCounts: archive.pairCounts,
+    pairHistoryByMember: archive.pairHistoryByMember,
+    opponentCounts: archive.opponentCounts,
+    opponentHistoryByMember: archive.opponentHistoryByMember,
+    selectedMemberNumber: null,
+    selectedOpponentMemberNumber: null,
+    selectedHistoryMemberNumber: null,
+    lastRestNumbers: [],
+    pendingNotices: [],
+    matchRoundCount: archive.matchRoundCount,
+    historyEntries: archive.historyEntries
+  });
+}
+
+function setArchiveViewTabAppearance(enabled) {
+  if (!tabMatch) return;
+
+  if (enabled) {
+    tabMatch.classList.add("tab-back-highlight");
+    if (tabMatchLabel) tabMatchLabel.textContent = "閲覧終了";
+    if (tabMatchIcon) tabMatchIcon.setAttribute("data-lucide", "arrow-left");
+  } else {
+    tabMatch.classList.remove("tab-back-highlight");
+    if (tabMatchLabel) tabMatchLabel.textContent = "試合";
+    if (tabMatchIcon) tabMatchIcon.setAttribute("data-lucide", "house");
+  }
+
+  if (window.lucide) {
+    window.lucide.createIcons();
+  }
+}
+
+function exitArchiveView() {
+  if (!isArchiveViewMode) return;
+
+  applyRuntimeState(runtimeStateBeforeArchiveView);
+  runtimeStateBeforeArchiveView = null;
+  isArchiveViewMode = false;
+
+  setArchiveViewTabAppearance(false);
+  setControlsLocked(isLocked);
+  renderPendingNotices();
+  updateCurrentRoundLabel();
+  renderHistoryList();
+  renderRestTable();
+  renderMemberPairStats();
+  renderOpponentStats();
+  renderRankingStats();
+  renderSessionArchiveList();
+  activateTab(tabMatch, screenMatch);
+}
+
+function openArchiveView(archiveId) {
+  const archive = resetArchives.find((item) => item.id === archiveId);
+  if (!archive || isArchiveViewMode) return;
+
+  runtimeStateBeforeArchiveView = captureRuntimeState();
+  applyArchiveToRuntime(archive);
+  isArchiveViewMode = true;
+
+  setArchiveViewTabAppearance(true);
+  if (tabBar) {
+    tabBar.classList.remove("hidden-panel");
+  }
+  renderPendingNotices();
+  updateCurrentRoundLabel();
+  renderHistoryList();
+  renderRestTable();
+  renderMemberPairStats();
+  renderOpponentStats();
+  renderRankingStats();
+  activateTab(tabHistory, screenHistory);
+}
+
+function renderSessionArchiveList() {
+  if (!sessionArchiveList || !sessionArchivePanel) return;
+
+  resetArchives = normalizeResetArchives(resetArchives);
+  saveResetArchives();
+
+  sessionArchiveList.innerHTML = "";
+
+  if (resetArchives.length === 0) {
+    const empty = document.createElement("p");
+    empty.className = "session-archive-empty";
+    empty.textContent = "保存された履歴はありません。";
+    sessionArchiveList.appendChild(empty);
+    return;
+  }
+
+  resetArchives.forEach((archive) => {
+    const button = document.createElement("button");
+    button.type = "button";
+    button.className = "session-archive-button";
+    button.textContent = formatResetArchiveLabel(archive);
+    button.addEventListener("click", () => {
+      openArchiveView(archive.id);
+    });
+    sessionArchiveList.appendChild(button);
+  });
+}
+
 function formatSavedScore(scoreA, scoreB) {
   if (scoreA === null || scoreB === null || scoreA === undefined || scoreB === undefined) {
     return "未入力";
@@ -164,6 +451,8 @@ function normalizeScoreInputField(input) {
 }
 
 function saveCourtScore(round, courtIndex, inputA, inputB) {
+  if (isArchiveViewMode) return;
+
   const entry = historyEntries.find((item) => item.type === "match" && item.round === round);
   if (!entry || !entry.courts || !entry.courts[courtIndex - 1]) return;
 
@@ -275,17 +564,20 @@ function buildCourtScorePanel(entry, court, courtIndex) {
   inputA.pattern = "[0-9]*";
   inputA.placeholder = "0";
   inputA.value = court.hasScoreInput ? String(court.scoreA ?? 0) : "";
-  inputA.addEventListener("input", () => {
-    normalizeScoreInputField(inputA);
-    queueAutoSave();
-  });
-  inputA.addEventListener("blur", (event) => {
-    if (event.relatedTarget && form.contains(event.relatedTarget)) return;
-    queueAutoSave();
-  });
-  inputA.addEventListener("keydown", (event) => {
-    if (event.key === "Enter") commit();
-  });
+  inputA.disabled = isArchiveViewMode;
+  if (!isArchiveViewMode) {
+    inputA.addEventListener("input", () => {
+      normalizeScoreInputField(inputA);
+      queueAutoSave();
+    });
+    inputA.addEventListener("blur", (event) => {
+      if (event.relatedTarget && form.contains(event.relatedTarget)) return;
+      queueAutoSave();
+    });
+    inputA.addEventListener("keydown", (event) => {
+      if (event.key === "Enter") commit();
+    });
+  }
   inputAWrap.appendChild(inputA);
 
   const dash = document.createElement("span");
@@ -303,17 +595,20 @@ function buildCourtScorePanel(entry, court, courtIndex) {
   inputB.pattern = "[0-9]*";
   inputB.placeholder = "0";
   inputB.value = court.hasScoreInput ? String(court.scoreB ?? 0) : "";
-  inputB.addEventListener("input", () => {
-    normalizeScoreInputField(inputB);
-    queueAutoSave();
-  });
-  inputB.addEventListener("blur", (event) => {
-    if (event.relatedTarget && form.contains(event.relatedTarget)) return;
-    queueAutoSave();
-  });
-  inputB.addEventListener("keydown", (event) => {
-    if (event.key === "Enter") commit();
-  });
+  inputB.disabled = isArchiveViewMode;
+  if (!isArchiveViewMode) {
+    inputB.addEventListener("input", () => {
+      normalizeScoreInputField(inputB);
+      queueAutoSave();
+    });
+    inputB.addEventListener("blur", (event) => {
+      if (event.relatedTarget && form.contains(event.relatedTarget)) return;
+      queueAutoSave();
+    });
+    inputB.addEventListener("keydown", (event) => {
+      if (event.key === "Enter") commit();
+    });
+  }
   inputBWrap.appendChild(inputB);
 
   scoreGrid.appendChild(inputAWrap);
@@ -1521,6 +1816,8 @@ function hideCreateConfirm() {
 
 // アプリ状態を初期化し、試合結果/履歴/統計表示をリセットします。
 function handleReset() {
+  archiveCurrentSessionBeforeReset();
+
   isLocked = false;
   setControlsLocked(false);
   activeNumbers = [];
@@ -1533,6 +1830,7 @@ function handleReset() {
   opponentHistoryByMember = {};
   selectedMemberNumber = null;
   selectedOpponentMemberNumber = null;
+  selectedHistoryMemberNumber = null;
   lastRestNumbers = [];
   matchRoundCount = 0;
   historyEntries = [];
@@ -1542,6 +1840,7 @@ function handleReset() {
   renderMemberPairStats();
   renderOpponentStats();
   renderRankingStats();
+  renderSessionArchiveList();
 }
 
 // リセット確認モーダルを開きます（モーダル未使用時は即実行）。
@@ -1590,6 +1889,10 @@ function activateTab(tabButton, screen) {
 
 if (tabMatch) {
   tabMatch.addEventListener("click", () => {
+    if (isArchiveViewMode) {
+      exitArchiveView();
+      return;
+    }
     activateTab(tabMatch, screenMatch);
   });
 }
@@ -1693,6 +1996,7 @@ removeParticipantButton.addEventListener("click", () => {
 });
 
 // 最初に画面を初期状態にします。
+resetArchives = loadResetArchives();
 resetResults();
 setControlsLocked(false);
 renderHistoryList();
@@ -1700,4 +2004,5 @@ renderRestTable();
 renderMemberPairStats();
 renderOpponentStats();
 renderRankingStats();
+renderSessionArchiveList();
 if (tabMatch) activateTab(tabMatch, screenMatch);

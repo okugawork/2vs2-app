@@ -761,6 +761,51 @@ button:disabled {
   gap: 8px;
 }
 
+.session-archive-panel {
+  margin-top: 12px;
+  border: 1px solid #dfe7fb;
+  border-radius: 14px;
+  padding: 10px;
+  background: linear-gradient(180deg, #ffffff 0%, #f8fbff 100%);
+  display: grid;
+  gap: 8px;
+}
+
+.session-archive-title {
+  margin: 0;
+  font-size: 0.84rem;
+  font-weight: 800;
+  color: #1f2e7f;
+}
+
+.session-archive-list {
+  display: grid;
+  gap: 6px;
+}
+
+.session-archive-empty {
+  margin: 0;
+  color: #64748b;
+  font-size: 0.84rem;
+}
+
+.session-archive-button {
+  width: 100%;
+  border: 1px solid #dbe3f7;
+  border-radius: 10px;
+  background: #fff;
+  color: #334155;
+  font-size: 0.84rem;
+  font-weight: 700;
+  text-align: left;
+  padding: 9px 10px;
+}
+
+.session-archive-button:hover {
+  background: #f6f9ff;
+  border-color: #c8d4f3;
+}
+
 .primary-action-stack {
   grid-column: 1 / span 2;
   flex: 1;
@@ -1085,6 +1130,11 @@ button:disabled {
   box-shadow: 0 0 0 3px rgba(123, 128, 255, 0.14), inset 0 -1px 0 rgba(255, 255, 255, 0.7);
 }
 
+.history-score-input-wrap input:disabled {
+  cursor: default;
+  opacity: 0.85;
+}
+
 .history-score-dash {
   font-size: 1.5rem;
   font-weight: 900;
@@ -1304,6 +1354,20 @@ button:disabled {
 
 .tab:active {
   transform: translateY(0);
+}
+
+.tab.tab-back-highlight {
+  color: #fff;
+  background: linear-gradient(135deg, #f97316 0%, #ea580c 100%);
+  box-shadow: 0 8px 16px rgba(234, 88, 12, 0.34);
+}
+
+.tab.tab-back-highlight:hover {
+  background: linear-gradient(135deg, #fb923c 0%, #ea580c 100%);
+}
+
+.tab.tab-back-highlight .tab-icon i {
+  stroke-width: 2.6;
 }
 
 .modal {
