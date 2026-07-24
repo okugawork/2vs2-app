@@ -323,6 +323,11 @@ body {
   transform-origin: bottom right;
 }
 
+.panel-summary:not(.setup-clean) .setup-hero-subtitle,
+.panel-summary:not(.setup-clean) .setup-hero-accent {
+  display: none;
+}
+
 .summary-top>div {
   border: 1px solid #e4e9f8;
   border-radius: 12px;
